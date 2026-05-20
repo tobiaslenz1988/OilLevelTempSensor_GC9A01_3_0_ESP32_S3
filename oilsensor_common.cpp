@@ -22,13 +22,13 @@ extern uint16_t OldOilLevelCompValues[11];
 void convertImpulseToPercentage(uint16_t cntRawData_Temp, uint16_t cntRawData_Level,uint8_t session) {
   if (session == UDS_Session_Control_Default_Session) 
   { /* Debug of... normal Operation*/
-  if(TimeoutSensorDetected == false)
+    if(TimeoutSensorDetected == false)
 	{
-    if(NewOilSensorEquipped==true)
+      if(NewOilSensorEquipped==true)
 	  {
 
       }else{
-        if (cntRawData_Level > OldOilLevelCompValues[10]) { oilLevelPercentage = OilLevelPercentageErrorValue; }else
+        if (cntRawData_Level > OldOilLevelCompValues[10]) { oilLevelPercentage = 253; }else
         if (cntRawData_Level = OldOilLevelCompValues[10]) { oilLevelPercentage = 100; }else
         if (cntRawData_Level >= OldOilLevelCompValues[9]) { oilLevelPercentage = 90; }else
         if (cntRawData_Level >= OldOilLevelCompValues[8]) { oilLevelPercentage = 80; }else
@@ -44,10 +44,13 @@ void convertImpulseToPercentage(uint16_t cntRawData_Temp, uint16_t cntRawData_Le
 
 
       if(NewOilSensorEquipped==true){
-
+        if (oilLevelPercentage > 0) {
+         
+        }else{ oilTemperature = OilTemperaturePercentageErrorValue;}
       }else{
         if (oilLevelPercentage > 0) {
-          if (cntRawData_Temp > OldOilTempCompValues[15]) { oilTemperature = OilTemperaturePercentageErrorValue; }else
+          
+          if (cntRawData_Temp > OldOilTempCompValues[15]) { oilTemperature = 253; }else
           if (cntRawData_Temp =  OldOilTempCompValues[15]) { oilTemperature = 115; }else
           if (cntRawData_Temp >= OldOilTempCompValues[14]) { oilTemperature = 110; }else
           if (cntRawData_Temp >= OldOilTempCompValues[13]) { oilTemperature = 105; }else
@@ -64,7 +67,7 @@ void convertImpulseToPercentage(uint16_t cntRawData_Temp, uint16_t cntRawData_Le
           if (cntRawData_Temp >= OldOilTempCompValues[2]) { oilTemperature = 50; }else
           if (cntRawData_Temp >= OldOilTempCompValues[1]) { oilTemperature = 40; }else
           if (cntRawData_Temp >= OldOilTempCompValues[0]) { oilTemperature = 30; }
-        }else{ oilTemperature = OilTemperaturePercentageInitValue;}
+        }else{ oilTemperature = OilLevelPercentageErrorValue;}
       }
 
 
