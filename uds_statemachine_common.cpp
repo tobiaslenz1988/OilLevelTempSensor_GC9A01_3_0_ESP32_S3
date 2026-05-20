@@ -134,8 +134,6 @@ void analyse_BT_Protocol(uint8_t receive_BT_Array[])
         BUS_output(0xF1);
         BUS_output(0x97);
   
-        //temp.toCharArray(Modulename, leng);
-        //BUS_output(temp);
         uint8_t sizeOfArr = sizeof(Modulename) / sizeof(Modulename[0]);
         uint8_t i;
         while(Modulename[i] != 0x00)
@@ -386,7 +384,6 @@ void analyse_BT_Protocol(uint8_t receive_BT_Array[])
            uint8_t length_of_name = receive_BT_Array[3];
           for (i=0;i<length_of_name;i++)
           {
-            //Modulename[i] =  (char) receive_BT_Array[4+i];
             tempStr.concat((char) receive_BT_Array[4+i]);
             vwPartNumberWaterTempSensor[i] = receive_BT_Array[4+i];
           }
@@ -411,7 +408,6 @@ void analyse_BT_Protocol(uint8_t receive_BT_Array[])
           uint8_t length_of_name = receive_BT_Array[3];
           for (i=0;i<length_of_name;i++)
           {
-            //Modulename[i] =  (char) receive_BT_Array[4+i];
             tempStr.concat((char) receive_BT_Array[4+i]);
             supplierPartNumberOilTempSensor[i] = receive_BT_Array[4+i];
           }
@@ -425,7 +421,7 @@ void analyse_BT_Protocol(uint8_t receive_BT_Array[])
       }
       else
 
-      
+
       /* 0x2E 0xf1 0x94 */
       /* set SupplierPartNumber of Water Tempsensor */
       if((receive_BT_Array[1]==0xF1) && (receive_BT_Array[2]==0x94))
@@ -437,7 +433,6 @@ void analyse_BT_Protocol(uint8_t receive_BT_Array[])
           uint8_t length_of_name = receive_BT_Array[3];
           for (i=0;i<length_of_name;i++)
           {
-            //Modulename[i] =  (char) receive_BT_Array[4+i];
             tempStr.concat((char) receive_BT_Array[4+i]);
             supplierPartNumberWaterTempSensor[i] = receive_BT_Array[4+i];
           }
@@ -464,24 +459,14 @@ void analyse_BT_Protocol(uint8_t receive_BT_Array[])
           Modulename =    {0,0,0,0,0, 0,0,0,0,0 ,0,0,0,0,0, 0,0,0,0,0};
           for (i=0;i<length_of_name;i++)
           {
-            //Modulename[i] =  (char) receive_BT_Array[4+i];
             tempStr.concat((char) receive_BT_Array[4+i]);
-            Modulename[i] = receive_BT_Array[4+i];
+            Modulename[i] =  receive_BT_Array[4+i];
           }
-      
-         /*  
-          for (i=0;i<length_of_name;i++)
-          {
-            Modulename[i] = Temparr[i];
-          }
-          */
        
           preferences.begin(EEPROMNameSpace, false); 
           preferences.putString("Modulename",tempStr);
           preferences.end();
-          //Modulename =  Temparray;
           SerialBT.begin(tempStr);
-         // Modulename=Temparr;
           BUS_output(posResponse);
           BUS_output(0xF1);
           BUS_output(0x97); 
