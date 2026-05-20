@@ -12,12 +12,11 @@ void BUS_output(uint8_t data )
 {
 	SerialBT.write(data);	
 }
-/*
+
 void initBtConnection(String name)
 {
 	  SerialBT.begin(name);
 }
 
-*/
 
 
