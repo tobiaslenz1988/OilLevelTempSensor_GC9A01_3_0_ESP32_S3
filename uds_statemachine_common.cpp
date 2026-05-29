@@ -1,18 +1,16 @@
 #include "esp32-hal.h"
 #include <Arduino.h>
 #include <stdio.h>
-
 #include <string.h>
 #include <Preferences.h>
-
-
 #include "uds_statemachine_common.h"
 #include "bus_common.h"
-#include "oilsensor_common.h"
-#include "nrc_uds_protocol_common.h"
+#include "oilsensor.h"
+#include "nrc_uds_protocol.h"
 #include "brand_defines_common.h"
 #include "softwareversion.h"
 #include "sensors/sensors.h"
+#include "dtc_oilsensor.h"
 
 
 extern Preferences preferences;
@@ -22,7 +20,7 @@ extern String oemPartNumberOilTempSensor;
 extern String supplierPartNumberOilTempSensor;
 extern String oemPartNumberWaterTempSensor;
 extern String supplierPartNumberWaterTempSensor;
-extern String HWModuleName;
+extern String HWModelleName;
 
 
 void delete_BT_buffer(void) { /*
@@ -67,7 +65,7 @@ void analyse_BT_Protocol(char receive_BT_Array[]) {
           /* Get Name of Central Chip */
           if ((receive_BT_Array[1] == 0xF1) && (receive_BT_Array[2] == 0x90)) {
             uint8_t i = 0;
-            while (HWModuleName[i] != '-') {
+            while (HWModelleName[i] != '-') {
               i = i + 1;
             }
             uint8_t len = 3+i;
@@ -77,7 +75,7 @@ void analyse_BT_Protocol(char receive_BT_Array[]) {
             data[2] = 0x90;
             for(int i=0;i<len;i++)
             {
-              data[3+i] = (uint8_t)HWModuleName[i];
+              data[3+i] = (uint8_t)HWModelleName[i];
             }
             BUS_output(data, len);
           } else
@@ -253,22 +251,22 @@ void analyse_BT_Protocol(char receive_BT_Array[]) {
             if ((receive_BT_Array[1] == 0x07) && (receive_BT_Array[2] == 0x00)) {    
               uint8_t i = 0;
               uint8_t tempvar;
-              uint8_t sizeOfArr = sizeof(OldOilTempCompValues) / sizeof(OldOilTempCompValues[0]);
-              uint8_t data[3+(sizeOfArr*2)];
+              uint8_t sizeOfArr = sizeof(OilTempCompValues) / sizeof(OilTempCompValues[0]);
+              uint8_t data[(3+(sizeOfArr*2))];
               data[0] = posResponse;
               data[1] = 0x07;
               data[2] = 0x00;
-              for (i = 0; i < (sizeOfArr*2; i+2) 
-              {
+              
+              for (i = 0; i < (sizeOfArr); i+2){
                 /* As example testval =         500 == 0x01F4    */
                 /* BUS_output((uint8_t*)testval >> 8);         -> 0x01 */
                 /* BUS_output((uint8_t*)testval & 0xFF);       -> 0xF4 */
-                data[3+i] = (OldOilTempCompValues[i] >> 8);
+                data[3+i] = (OilTempCompValues[i] >> 8);
                 //BUS_output((uint8_t*)tempvar);
-                data[4+i] = (OldOilTempCompValues[i] & 0xFF);
+                data[4+i] = (OilTempCompValues[i] & 0xFF);
                 //BUS_output((uint8_t*)tempvar);
               }
-                BUS_output(data, 3+(sizeOfArr*2);
+                BUS_output(data, 3+(sizeOfArr*2));
             } else
 
             /* 0x22 0x07 0x01 */
@@ -276,33 +274,34 @@ void analyse_BT_Protocol(char receive_BT_Array[]) {
             if ((receive_BT_Array[1] == 0x07) && (receive_BT_Array[2] == 0x01)) {
               uint8_t i = 0;
               uint8_t tempvar;
-              uint8_t sizeOfArr = sizeof(OldOilLevelCompValues) / sizeof(OldOilLevelCompValues[0]);
+              uint8_t sizeOfArr = sizeof(OilLevelCompValues) / sizeof(OilLevelCompValues[0]);
               uint8_t data[3+(sizeOfArr*2)];
               data[0] = posResponse;
               data[1] = 0x07;
               data[2] = 0x01;
-              for (i = 0; i < (sizeOfArr*2; i+2) 
+              for (i = 0; i < (sizeOfArr*2); i+2) 
               {
                 /* As example testval =         500 == 0x01F4    */
                 /* BUS_output((uint8_t*)testval >> 8);         -> 0x01 */
                 /* BUS_output((uint8_t*)testval & 0xFF);       -> 0xF4 */
-                data[3+i] = (OldOilLevelCompValues[i] >> 8);
+                data[3+i] = (OilLevelCompValues[i] >> 8);
                 //BUS_output((uint8_t*)tempvar);
-                data[4+i] = (OldOilLevelCompValues[i] & 0xFF);
+                data[4+i] = (OilLevelCompValues[i] & 0xFF);
                 //BUS_output((uint8_t*)tempvar);
               }
-              BUS_output(data, 3+(sizeOfArr*2);
+              BUS_output(data, 3+(sizeOfArr*2));
 
 
             } else
             /* 0x22 0x07 0x02 */
-            /* tbd */
+            /* Number of DTC Entries */
             if ((receive_BT_Array[1] == 0x07) && (receive_BT_Array[2] == 0x02)) {
-              uint8_t data[3];
+              uint8_t data[4];
               data[0] = posResponse;
               data[1] = 0x07;
               data[2] = 0x02;
-              BUS_output(data, 3);
+              data[3] = numberOfDTCEntries();
+              BUS_output(data, 4);
 
             } else
 
@@ -310,9 +309,26 @@ void analyse_BT_Protocol(char receive_BT_Array[]) {
             /* tbd */
             if ((receive_BT_Array[1] == 0x07) && (receive_BT_Array[2] == 0x03)) {
               uint8_t data[3];
+              //uint32_t dtcstatus = getDTCStorageObject();
+              uint32_t dtcstatus = 0x12345678;
               data[0] = posResponse;
               data[1] = 0x07;
               data[2] = 0x03;
+              data[3] = dtcstatus & 0xFF;                  // Niedrigstes Byte (0x78)
+              data[4] = (dtcstatus >> 8) & 0xFF;           // Zweites Byte (0x56)
+              data[5] = (dtcstatus >> 16) & 0xFF;          // Drittes Byte (0x34)
+              data[6] = (dtcstatus >> 24) & 0xFF;          // Höchstes Byte (0x12)
+              BUS_output(data, 7);
+
+            } else 
+
+            /* 0x22 0x07 0x04 */
+            /* tbd */
+            if ((receive_BT_Array[1] == 0x07) && (receive_BT_Array[2] == 0x04)) {
+              uint8_t data[3];
+              data[0] = posResponse;
+              data[1] = 0x07;
+              data[2] = 0x04;
               BUS_output(data, 3);
 
             } else {
@@ -336,12 +352,12 @@ void analyse_BT_Protocol(char receive_BT_Array[]) {
           {
             uint8_t i;
             String tempStr;
-            HWModuleName = { '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-' };
+            HWModelleName = { '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-' };
             uint8_t length_of_name = receive_BT_Array[3];
             for (i = 0; i < length_of_name; i++) 
             {
               tempStr.concat((char)receive_BT_Array[4 + i]);
-              HWModuleName[i] = receive_BT_Array[4 + i];
+              HWModelleName[i] = receive_BT_Array[4 + i];
             }
 
             preferences.begin(EEPROMNameSpace, false);
@@ -555,7 +571,7 @@ void analyse_BT_Protocol(char receive_BT_Array[]) {
               data[2] = UDS_NRC_incorrectMessageLengthOrInvalidFormat;
               BUS_output(data, 3);
             } else {
-              if ((val == BRAND_AUDI_ALT) || (val == BRAND_VW) || (val == BRAND_AUDI_NEU) || (val == BRAND_CHEVY) || (val == BRAND_DODGE) || (val == BRAND_NISSAN_GTT) || (val == BRAND_BMW) || (val == BRAND_MERCEDES_OLD)) {
+              if ((val == BRAND_AUDI) || (val == BRAND_VW) || (val == BRAND_CHEVY) || (val == BRAND_DODGE) || (val == BRAND_NISSAN_GTT)|| (val == BRAND_BMW) || (val == BRAND_MERCEDES_OLD)) {
                 brandSelector = val;
                 preferences.begin(EEPROMNameSpace, false);
                 preferences.putUChar("Brand", val);
@@ -636,37 +652,37 @@ void analyse_BT_Protocol(char receive_BT_Array[]) {
             } else {
               preferences.begin(EEPROMNameSpace, false);
               uint16_t temp = ((uint16_t)receive_BT_Array[3] << 8) | receive_BT_Array[4];
-              preferences.putShort("Old_sensor_Temperature_30", temp);
+              preferences.putShort("SENSOR_Temperature_30", temp);
               temp = ((uint16_t)receive_BT_Array[5] << 8) | receive_BT_Array[6];
-              preferences.putShort("Old_sensor_Temperature_40", temp);
+              preferences.putShort("SENSOR_Temperature_40", temp);
               temp = ((uint16_t)receive_BT_Array[7] << 8) | receive_BT_Array[8];
-              preferences.putShort("Old_sensor_Temperature_50", temp);
+              preferences.putShort("SENSOR_Temperature_50", temp);
               temp = ((uint16_t)receive_BT_Array[9] << 8) | receive_BT_Array[10];
-              preferences.putShort("Old_sensor_Temperature_55", temp);
+              preferences.putShort("SENSOR_Temperature_55", temp);
               temp = ((uint16_t)receive_BT_Array[11] << 8) | receive_BT_Array[12];
-              preferences.putShort("Old_sensor_Temperature_60", temp);
+              preferences.putShort("SENSOR_Temperature_60", temp);
               temp = ((uint16_t)receive_BT_Array[13] << 8) | receive_BT_Array[14];
-              preferences.putShort("Old_sensor_Temperature_65", temp);
+              preferences.putShort("SENSOR_Temperature_65", temp);
               temp = ((uint16_t)receive_BT_Array[15] << 8) | receive_BT_Array[16];
-              preferences.putShort("Old_sensor_Temperature_70", temp);
+              preferences.putShort("SENSOR_Temperature_70", temp);
               temp = ((uint16_t)receive_BT_Array[17] << 8) | receive_BT_Array[18];
-              preferences.putShort("Old_sensor_Temperature_75", temp);
+              preferences.putShort("SENSOR_Temperature_75", temp);
               temp = ((uint16_t)receive_BT_Array[19] << 8) | receive_BT_Array[20];
-              preferences.putShort("Old_sensor_Temperature_80", temp);
+              preferences.putShort("SENSOR_Temperature_80", temp);
               temp = ((uint16_t)receive_BT_Array[21] << 8) | receive_BT_Array[22];
-              preferences.putShort("Old_sensor_Temperature_85", temp);
+              preferences.putShort("SENSOR_Temperature_85", temp);
               temp = ((uint16_t)receive_BT_Array[23] << 8) | receive_BT_Array[24];
-              preferences.putShort("Old_sensor_Temperature_90", temp);
+              preferences.putShort("SENSOR_Temperature_90", temp);
               temp = ((uint16_t)receive_BT_Array[25] << 8) | receive_BT_Array[26];
-              preferences.putShort("Old_sensor_Temperature_95", temp);
+              preferences.putShort("SENSOR_Temperature_95", temp);
               temp = ((uint16_t)receive_BT_Array[27] << 8) | receive_BT_Array[28];
-              preferences.putShort("Old_sensor_Temperature_100", temp);
+              preferences.putShort("SENSOR_Temperature_100", temp);
               temp = ((uint16_t)receive_BT_Array[29] << 8) | receive_BT_Array[30];
-              preferences.putShort("Old_sensor_Temperature_105", temp);
+              preferences.putShort("SENSOR_Temperature_105", temp);
               temp = ((uint16_t)receive_BT_Array[31] << 8) | receive_BT_Array[32];
-              preferences.putShort("Old_sensor_Temperature_110", temp);
+              preferences.putShort("SENSOR_Temperature_110", temp);
               temp = ((uint16_t)receive_BT_Array[33] << 8) | receive_BT_Array[34];
-              preferences.putShort("Old_sensor_Temperature_115", temp);
+              preferences.putShort("SENSOR_Temperature_115", temp);
               preferences.end();
               uint8_t data[3];
               data[0] = posResponse;
@@ -689,27 +705,27 @@ void analyse_BT_Protocol(char receive_BT_Array[]) {
             } else {
               preferences.begin(EEPROMNameSpace, false);
               uint16_t temp = ((uint16_t)receive_BT_Array[3] << 8) | receive_BT_Array[4];
-              preferences.putShort("Old_sensor_OilLevelEmpty", temp);
+              preferences.putShort("SENSOR_OilLevelEmpty", temp);
               temp = ((uint16_t)receive_BT_Array[5] << 8) | receive_BT_Array[6];
-              preferences.putShort("Old_sensor_OilLevel_10", temp);
+              preferences.putShort("SENSOR_OilLevel_10", temp);
               temp = ((uint16_t)receive_BT_Array[7] << 8) | receive_BT_Array[8];
-              preferences.putShort("Old_sensor_OilLevel_20", temp);
+              preferences.putShort("SENSOR_OilLevel_20", temp);
               temp = ((uint16_t)receive_BT_Array[9] << 8) | receive_BT_Array[10];
-              preferences.putShort("Old_sensor_OilLevel_30", temp);
+              preferences.putShort("SENSOR_OilLevel_30", temp);
               temp = ((uint16_t)receive_BT_Array[11] << 8) | receive_BT_Array[12];
-              preferences.putShort("Old_sensor_OilLevel_40", temp);
+              preferences.putShort("SENSOR_OilLevel_40", temp);
               temp = ((uint16_t)receive_BT_Array[13] << 8) | receive_BT_Array[14];
-              preferences.putShort("Old_sensor_OilLevel_50", temp);
+              preferences.putShort("SENSOR_OilLevel_50", temp);
               temp = ((uint16_t)receive_BT_Array[15] << 8) | receive_BT_Array[16];
-              preferences.putShort("Old_sensor_OilLevel_60", temp);
+              preferences.putShort("SENSOR_OilLevel_60", temp);
               temp = ((uint16_t)receive_BT_Array[17] << 8) | receive_BT_Array[18];
-              preferences.putShort("Old_sensor_OilLevel_70", temp);
+              preferences.putShort("SENSOR_OilLevel_70", temp);
               temp = ((uint16_t)receive_BT_Array[19] << 8) | receive_BT_Array[20];
-              preferences.putShort("Old_sensor_OilLevel_80", temp);
+              preferences.putShort("SENSOR_OilLevel_80", temp);
               temp = ((uint16_t)receive_BT_Array[21] << 8) | receive_BT_Array[22];
-              preferences.putShort("Old_sensor_OilLevel_90", temp);
+              preferences.putShort("SENSOR_OilLevel_90", temp);
               temp = ((uint16_t)receive_BT_Array[23] << 8) | receive_BT_Array[24];
-              preferences.putShort("Old_sensor_OilLevelFull", temp);
+              preferences.putShort("SENSOR_OilLevelFull", temp);
 
               preferences.end();
               uint8_t data[3];
@@ -719,9 +735,10 @@ void analyse_BT_Protocol(char receive_BT_Array[]) {
               BUS_output(data, 3);
             }
           } else
+          
           /* tbd */
-          /* 0x2E 0x07 0x02 0x!!......*/
-          if ((receive_BT_Array[1] == 0x07) && (receive_BT_Array[2] == 0x02)) {
+          /* 0x2E 0x07 0x03 0x!!......*/
+          if ((receive_BT_Array[1] == 0x07) && (receive_BT_Array[2] == 0x03)) {
             uint8_t val = NULL;
             val = (uint8_t)receive_BT_Array[3];
             if (val == NULL) {
@@ -734,36 +751,17 @@ void analyse_BT_Protocol(char receive_BT_Array[]) {
               uint8_t data[3];
               data[0] = posResponse;
               data[1] = 0x07;
-              data[2] = 0x02;
+              data[2] = 0x03;
               BUS_output(data, 3);
             }
-          } else
-            /* tbd */
-            /* 0x2E 0x07 0x03 0x!!......*/
-            if ((receive_BT_Array[1] == 0x07) && (receive_BT_Array[2] == 0x03)) {
-              uint8_t val = NULL;
-              val = (uint8_t)receive_BT_Array[3];
-              if (val == NULL) {
-                uint8_t data[3];
-                data[0] = 0x7f;
-                data[1] = 0x2e;
-                data[2] = UDS_NRC_incorrectMessageLengthOrInvalidFormat;
-                BUS_output(data, 3);
-              } else {
-                uint8_t data[3];
-                data[0] = posResponse;
-                data[1] = 0x07;
-                data[2] = 0x03;
-                BUS_output(data, 3);
-              }
-            } else{
-              uint8_t data[3];
-              data[0] = 0x7f;
-              data[1] = UDS_WRITE_DATA_BY_IDENTIFIER;
-              data[2] = UDS_NRC_requestOutOfRange;
-              BUS_output(data, 3);
-            }
-          } else
+          } else{
+            uint8_t data[3];
+            data[0] = 0x7f;
+            data[1] = UDS_WRITE_DATA_BY_IDENTIFIER;
+            data[2] = UDS_NRC_requestOutOfRange;
+            BUS_output(data, 3);
+          }
+        } else
 
           /* Session Control */
           if (receive_BT_Array[0] == UDS_Session_Control) {

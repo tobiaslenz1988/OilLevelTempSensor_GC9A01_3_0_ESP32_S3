@@ -1,149 +1,80 @@
-/*
-  This example is for the combined OilLevel/Temoerature Sensor G266 of the VAG Family.
-  There are two types of the Sensor:
-
-  The "old" Version, used in 
-  -Audi A4 (B5) 1.8 20V 
-  -Audi A2 
-  -VW Transporter T4
-  -VW Golf 5 1.9 TDI
-  -etc...
-
-  The old Version has the Part Numbers 
-  1J0 907 660 
-  1J0 907 660 A
-  1J0 907 660 B
-  1J0 907 660 C
-  1J0 907 660 F
-
-  The old Version has a metal big Plate at the Bottom and the Tube to measure the oil is ONE PIECE and is formed in a rectangular form and NOT Square.
-
-
-
-
-
-  The "new" Version, used in 
-  - Audi A4, A6 from 2010
-  - Audi Q5 from 2010
-  - etc
-
-  The new Version has the Part Numbers 
-  03C 907 660 M
-
-
-  In the new Version the Bottom is made of plastic and the Tube to measure the oil is Two PIECES. The Tube itself is formed in a H-Design and at the top of the Tube is a square 2nd Part
-
-
-
-  This code is based on the Information from https://www.mikrocontroller.net/topic/459687 (which uses the "old" Version)
-
-  The Sensor has 3 Pins
-
-  Pinning:
-  Pin    Pin    Pin 
-   1      2      3
-  12V    Gnd    Signal (High 200mV)
-
-
-  - As Default Pin 2 used as an Input for the Signal of the Sensor 
-  - As Default Pin 4 kind of Debug Pin to verify how often the Signalinput ISR is triggered
-  - As Default Pin 13 is used for an LED for the Oil level which turns on if theres is to low 
-  - As Default Pin 15 is used for an LED to show the oil Temperature
-    The LED is on if Engine is two cold
-    The LED is off if Engine is in normal temperature area
-    The LED toggles if the Engine is too Hot
-
-  Circuit:
-  Between the 3.3V output from the ESP 32n is a 4.7K Ohm resistor as a Pullup resistor.
-  The Ground if the Sensor is connected to Ground of the Sensor
-  The 
-
-*/
-
-/*
-The Signal looks like the following
-
-  ______      _______                                   __
-  |     |     |     |                                  |
-  |     |     |     |                                  |
-  |     |     |     |                                  |
-__|     |_____|     |__________________________________|
-T1   T2   T3    T4                  T5                    T1
-*/
-
-
-#include <BluetoothSerial.h>
 #include <Preferences.h>
 #include <stdio.h>
-#include <string.h>
 #include <TJpg_Decoder.h>
-#include <SPI.h>
 #include <TFT_eSPI.h>
-
+#include <SPI.h>
 
 #include "display/Oil_LevelGraphic_GCA901_240_240/oil_level_graphic.h"
 #include "display/display_selector.h"
 #include "display/logos/logos.h"
-
-//#include "oilsensorled.h"
-
-#include "nrc_uds_protocol_common.h"
+#include "nrc_uds_protocol.h"
 #include "uds_statemachine_common.h"
-#include "oilsensor_common.h"
+#include "oilsensor.h"
 #include "brand_defines_common.h"
 #include "bus_common.h"
 #include "softwareversion.h"
 #include "sensors/sensors.h"
-
+#include "dtc_oilsensor.h"
+#include "dtc_oilsensor_defines.h"
+#include <stdlib.h>
+#include <iostream>
+#include <string.h>
 
 Preferences preferences;
-BluetoothSerial SerialBT;
-TFT_eSPI tft = TFT_eSPI();
 
-
-bool Impuls_1_High                      = false;
-bool Impuls_1_Low                       = false;
-bool Impuls_2_High                      = false;
-bool Impuls_2_Low                       = false;
-
-uint8_t session                         = UDS_Session_Control_Default_Session;
+char charArrGlobal[35];
+uint8_t session                         = UDS_Session_Control_Extended_Session;
 uint8_t displayselector                 = DISPLAY_SELECTOR_GC9A01;
-
 uint8_t signalinput                     = 0;
-uint16_t cnt                            = 0;
 uint8_t oilTemperature                  = OilTemperaturePercentageInitValue; /*init value 254*/
 uint8_t oilLevelPercentage              = OilLevelPercentageInitValue; /*init value 254*/
 uint8_t testValue_oilTemperature        = 85; /* Debugvalue 255 */
 uint8_t testValue_oilLevelPercentage    = 60; /* Debugvalue 255 */
 uint8_t lastOilTemp                     = 0;
 uint8_t lastOilLevel                    = 0;
-uint16_t startUpCounter                 = 0;
-uint8_t brandSelector                   = 0;
+uint8_t brandSelector                   = 1;
 
-hw_timer_t *timer                       = NULL;
+
+hw_timer_t *timer                                 = NULL; 
+portMUX_TYPE timerMux                             =  portMUX_INITIALIZER_UNLOCKED;
+/* The Modulename is the Bluetoothname of the Whole System */
+String  Modulename                                =  {0,0,0,0,0, 0,0,0,0,0 ,0,0,0,0,0, 0,0,0,0,0};
+
+/* The HWModuleName is the Modelanme of the used central Bt Module */
+String  HWModelleName                             =  {'-','-','-','-','-', '-','-','-','-','-', '-','-','-','-','-'};
+
+/* The Partnumber of the OilTempsensor  of the OEM */
+String  oemPartNumberOilTempSensor                =  DEFAULT_OEM_PARTNUMBER_OIL_TEMPSENSOR;
+
+/* The Partnumber of the OilTempsensor  of the Supplier */
+String  supplierPartNumberOilTempSensor           =  DEFAULT_SUPPLIER_PARTNUMBER_OIL_TEMPSENSOR;
+
+/* The Partnumber of the WaterTempSensor  of the OEM */
+String  oemPartNumberWaterTempSensor              =  DEFAULT_OEM_PARTNUMBER_WATER_TEMPSENSOR;
+
+/* The Partnumber of the WaterTempSensor  of the Supplier  */
+String  supplierPartNumberWaterTempSensor         =  DEFAULT_SUPPLIER_PARTNUMBER_WATER_TEMPSENSOR;
+String  UDS_receiveString;
+
+uint16_t cnt                            = 0;
+uint16_t startUpCounter                 = 0;
+
 static uint16_t                         cntRawArr[4];
 static uint16_t                         returnArray[4];
-
-      
-portMUX_TYPE timerMux                           =  portMUX_INITIALIZER_UNLOCKED;
-String  Modulename                              =  {0,0,0,0,0, 0,0,0,0,0 ,0,0,0,0,0, 0,0,0,0,0};
-String  HWModuleName                            =  {'-','-','-','-','-', '-','-','-','-','-', '-','-','-','-','-'};// ESP32
-String  vwPartNumberOilTempSensor               =  DEFAULT_VW_PARTNUMBER_OIL_TEMPSENSOR;
-String  supplierPartNumberOilTempSensor         =  DEFAULT_SUPPLIER_PARTNUMBER_OIL_TEMPSENSOR;
-String  vwPartNumberWaterTempSensor             =  DEFAULT_VW_PARTNUMBER_WATER_TEMPSENSOR;
-String  supplierPartNumberWaterTempSensor       =  DEFAULT_SUPPLIER_PARTNUMBER_WATER_TEMPSENSOR;
-
-
-uint16_t OldOilTempCompValues[]         = {Old_sensor_Temperature_30,Old_sensor_Temperature_40,Old_sensor_Temperature_50,Old_sensor_Temperature_55,Old_sensor_Temperature_60,Old_sensor_Temperature_65,Old_sensor_Temperature_70,Old_sensor_Temperature_75,Old_sensor_Temperature_80,Old_sensor_Temperature_85,Old_sensor_Temperature_90,Old_sensor_Temperature_95,Old_sensor_Temperature_100,Old_sensor_Temperature_105,Old_sensor_Temperature_110,Old_sensor_Temperature_115};
-uint16_t OldOilLevelCompValues[]        = {Old_sensor_OilLevelEmpty,Old_sensor_OilLevel_10,Old_sensor_OilLevel_20,Old_sensor_OilLevel_30,Old_sensor_OilLevel_40,Old_sensor_OilLevel_50,Old_sensor_OilLevel_60,Old_sensor_OilLevel_70,Old_sensor_OilLevel_80,Old_sensor_OilLevel_90,Old_sensor_OilLevelFull};
+uint16_t OilTempCompValues[]         = {SENSOR_Temperature_30,SENSOR_Temperature_40,SENSOR_Temperature_50,SENSOR_Temperature_55,SENSOR_Temperature_60,SENSOR_Temperature_65,SENSOR_Temperature_70,SENSOR_Temperature_75,SENSOR_Temperature_80,SENSOR_Temperature_85,SENSOR_Temperature_90,SENSOR_Temperature_95,SENSOR_Temperature_100,SENSOR_Temperature_105,SENSOR_Temperature_110,SENSOR_Temperature_115};
+uint16_t OilLevelCompValues[]        = {SENSOR_OilLevelEmpty,SENSOR_OilLevel_10,SENSOR_OilLevel_20,SENSOR_OilLevel_30,SENSOR_OilLevel_40,SENSOR_OilLevel_50,SENSOR_OilLevel_60,SENSOR_OilLevel_70,SENSOR_OilLevel_80,SENSOR_OilLevel_90,SENSOR_OilLevelFull};
 
 bool NewData                            = false;
 bool TimeoutSensorDetected              = true;
 bool toggleInvertDisplayFlag            = false;
 bool NewOilSensorEquipped               = false;
 bool statusOfExtraOutputPin             = false;
+bool Impuls_1_High                      = false;
+bool Impuls_1_Low                       = false;
+bool Impuls_2_High                      = false;
+bool Impuls_2_Low                       = false;
 
-
+TFT_eSPI   tft = TFT_eSPI();
 #define SignalInputPin                2
 #define ISRDebugTogglePin             4
 
@@ -164,8 +95,8 @@ bool statusOfExtraOutputPin             = false;
 #define GC9A01A_RED                   0xF800
 #define GC9A01A_BLUE                  0x001F
 #define time10s_ShowBrandLogo         400
+uint8_t tflag = 0;
 
-uint8_t BT_rx_buffer[Buffersize];
 
     
 
@@ -284,6 +215,7 @@ void  orderImpulse(uint16_t inputArr[]) {
 
 
 void sendInfosToBT(uint8_t temperature, uint8_t OilLevel,uint16_t outputarr[]) {
+  /*
   if (session == UDS_Session_Control_Development_Session)
   {
     uint8_t i;
@@ -321,20 +253,14 @@ void sendInfosToBT(uint8_t temperature, uint8_t OilLevel,uint16_t outputarr[]) {
     SerialBT.println(OilLevel);
     delay(1000);
   }
+  */
 }
 
 
 
-void getBTData(const uint8_t *buffer, size_t size)
-{
-  uint8_t i=0;
-  for(i=0;i<size;i++){
-    BT_rx_buffer[i] = buffer[i];
-  }
-  NewData = true;
-}
 
-void showOilLevelAtDisplay(uint8_t percentageOillevel,bool initflag)
+
+void showOilLevelNormalOperation(uint8_t percentageOillevel,bool initflag)
 {
   if((lastOilLevel!=oilLevelPercentage) || (lastOilTemp != oilTemperature))
   {
@@ -358,15 +284,15 @@ void showOilLevelAtDisplay(uint8_t percentageOillevel,bool initflag)
       if(percentageOillevel == 80){tft.drawBitmap(OFFSET_IMAGE_X, OFFSET_IMAGE_Y, image_OilLevel_80, IMAGE_WIDTH, IMAGE_HEIGHT,GC9A01A_WHITE);} else
       if(percentageOillevel == 90){tft.drawBitmap(OFFSET_IMAGE_X, OFFSET_IMAGE_Y, image_OilLevel_90, IMAGE_WIDTH, IMAGE_HEIGHT,GC9A01A_WHITE);} else
       if(percentageOillevel == 100){tft.drawBitmap(OFFSET_IMAGE_X, OFFSET_IMAGE_Y, image_OilLevel_100, IMAGE_WIDTH, IMAGE_HEIGHT,GC9A01A_WHITE);} 
-      tft.setTextSize(2);
+     
       tft.setTextColor(GC9A01A_WHITE);
+      tft.setTextSize(2);
       tft.setCursor(67, 37);
       tft.print("MAX");
-
-      tft.setTextColor(GC9A01A_WHITE);
       tft.setCursor(67, 185);
       tft.print("MIN");
-
+      
+      
       if(oilTemperature<100)
       {
         tft.setTextColor(GC9A01A_WHITE);
@@ -386,8 +312,11 @@ void showOilLevelAtDisplay(uint8_t percentageOillevel,bool initflag)
         tft.print(char(248));
         tft.setCursor(190, 105);
         tft.print("C");
+        setDTC(DTC_BIT_07_OILTEMP_TO_HIGH);
       }
-
+  
+      printNumberDTC();
+    
 
     }else{
       if(initflag==false)
@@ -395,12 +324,11 @@ void showOilLevelAtDisplay(uint8_t percentageOillevel,bool initflag)
          /* Oillevel not Ok */
         if(percentageOillevel == 00){ tft.drawBitmap(OFFSET_IMAGE_X, OFFSET_IMAGE_Y, image_OilLevel_00, IMAGE_WIDTH, IMAGE_HEIGHT,GC9A01A_RED);} else
         if(percentageOillevel == 10){ tft.drawBitmap(OFFSET_IMAGE_X, OFFSET_IMAGE_Y, image_OilLevel_10, IMAGE_WIDTH, IMAGE_HEIGHT,GC9A01A_RED);} 
+
         tft.setTextColor(GC9A01A_WHITE);
         tft.setTextSize(2);
-      
         tft.setCursor(67, 37);
         tft.print("MAX");
-        
         tft.setCursor(67, 185);
         tft.print("MIN");
 
@@ -410,6 +338,7 @@ void showOilLevelAtDisplay(uint8_t percentageOillevel,bool initflag)
         tft.print("Check");
         tft.setCursor(98, 130);
         tft.print("Oil");
+        printNumberDTC();     
         if(toggleInvertDisplayFlag== false)
         {
           toggleInvertDisplayFlag = true;
@@ -431,7 +360,10 @@ void showOilLevelAtDisplay(uint8_t percentageOillevel,bool initflag)
     tft.print("Sensor");
     tft.setCursor(100, 130);
     tft.print("OL");
-        
+    setDTC(DTC_BIT_05_OILTEMP_SENSOR_NOT_CONNECTED);   
+    printNumberDTC(); 
+ 
+
     if(toggleInvertDisplayFlag == false)
     {
       toggleInvertDisplayFlag = true;
@@ -455,7 +387,7 @@ void controlOfDisplay()
       tft.setTextColor(GC9A01A_WHITE);
       startUpCounter = startUpCounter+1;
     }
-    showOilLevelAtDisplay(oilLevelPercentage,false);
+    showOilLevelNormalOperation(oilLevelPercentage,false);
   } else
   /* short initialization sequence*/
   if((startUpCounter>=0) && (startUpCounter<time10s_ShowBrandLogo))
@@ -477,48 +409,48 @@ void controlOfDisplay()
 }
 void showBrandLogo(uint8_t brandvalue)
 {  
+  uint16_t w = 0, h = 0;
   if(brandvalue == BRAND_VW){
-    uint16_t w = 0, h = 0;
     tft.setTextColor(GC9A01A_BLACK);
     TJpgDec.getJpgSize(&w, &h, vw_logo, sizeof(vw_logo));
     TJpgDec.drawJpg(0, 0, vw_logo, sizeof(vw_logo));
 
-  }else if(brandvalue == BRAND_AUDI_ALT){
-    uint16_t w = 0, h = 0;
+  }else if(brandvalue == BRAND_AUDI){
     tft.fillScreen(GC9A01A_WHITE);
     tft.setTextColor(GC9A01A_BLACK);
     TJpgDec.getJpgSize(&w, &h, audi_alt_logo, sizeof(audi_alt_logo));
     TJpgDec.drawJpg(0, 50, audi_alt_logo, sizeof(audi_alt_logo));
 
-  }else if(brandvalue == BRAND_AUDI_NEU){
-
   }else if(brandvalue == BRAND_DODGE){
-    uint16_t w = 0, h = 0;
     tft.fillScreen(GC9A01A_BLACK);
     tft.setTextColor(GC9A01A_WHITE);
     TJpgDec.getJpgSize(&w, &h, dodge_logo, sizeof(dodge_logo));
     TJpgDec.drawJpg(0, 115, dodge_logo, sizeof(dodge_logo));
 
   }else if(brandvalue == BRAND_NISSAN_GTT){
-    uint16_t w = 0, h = 0;
     tft.fillScreen(GC9A01A_WHITE);
     tft.setTextColor(GC9A01A_BLACK);
     TJpgDec.getJpgSize(&w, &h, gtt_logo, sizeof(gtt_logo));
     TJpgDec.drawJpg(5, 50, gtt_logo, sizeof(gtt_logo));
 
+
   }else if(brandvalue == BRAND_CHEVY){
-    uint16_t w = 0, h = 0;
     tft.fillScreen(GC9A01A_BLACK);
     tft.setTextColor(GC9A01A_WHITE);
     TJpgDec.getJpgSize(&w, &h, chevy_logo, sizeof(chevy_logo));
     TJpgDec.drawJpg(0, 80, chevy_logo, sizeof(chevy_logo));
     
   }else if(brandvalue == BRAND_BMW){
-    uint16_t w = 0, h = 0;
     tft.fillScreen(GC9A01A_BLACK);
     tft.setTextColor(GC9A01A_WHITE);
     TJpgDec.getJpgSize(&w, &h, bmw_logo, sizeof(bmw_logo));
     TJpgDec.drawJpg(0, 0, bmw_logo, sizeof(bmw_logo));
+
+  }else if(brandvalue == BRAND_MERCEDES_OLD){
+    tft.fillScreen(GC9A01A_BLACK);
+    tft.setTextColor(GC9A01A_BLACK);
+    TJpgDec.getJpgSize(&w, &h, mercedes_old_logo, sizeof(mercedes_old_logo));
+    TJpgDec.drawJpg(0, 0, mercedes_old_logo, sizeof(mercedes_old_logo));
   }else if(brandvalue == BRAND_Init){
 
   }
@@ -531,45 +463,46 @@ void readEepromValues()
   preferences.clear();
   preferences.begin(EEPROMNameSpace, false);
     
-  session               = (uint8_t) preferences.getUChar("session",UDS_Session_Control_Default_Session);
-  NewOilSensorEquipped  = preferences.getBool("NewSensorflag",false);
-  brandSelector = preferences.getUChar("Brand",BRAND_VW);
+  session                                 = (uint8_t) preferences.getUChar("session",UDS_Session_Control_Default_Session);
+  NewOilSensorEquipped                    = preferences.getBool("NewSensorflag",false);
+  brandSelector                           = preferences.getUChar("Brand",BRAND_VW);
 
   Modulename                              =  preferences.getString("Modulename","OilSensor");
-  HWModuleName                            =  preferences.getString("HWModuleName",{'-','-','-','-','-',    '-','-','-','-','-',    '-','-','-','-','-' }); 
-  vwPartNumberOilTempSensor               =  preferences.getString("PartNumberOilTempSensor",DEFAULT_VW_PARTNUMBER_OIL_TEMPSENSOR);
+  HWModelleName                           =  preferences.getString("HWModuleName",{'-','-','-','-','-',    '-','-','-','-','-',    '-','-','-','-','-' }); 
+  oemPartNumberOilTempSensor              =  preferences.getString("PartNumberOilTempSensor",DEFAULT_OEM_PARTNUMBER_OIL_TEMPSENSOR);
   supplierPartNumberOilTempSensor         =  preferences.getString("supplierPartNumberOilTempSensor",DEFAULT_SUPPLIER_PARTNUMBER_OIL_TEMPSENSOR);
-  vwPartNumberWaterTempSensor             =  preferences.getString("PartNumberWaterTempSensor", DEFAULT_VW_PARTNUMBER_WATER_TEMPSENSOR); 
+  oemPartNumberWaterTempSensor            =  preferences.getString("PartNumberWaterTempSensor", DEFAULT_OEM_PARTNUMBER_WATER_TEMPSENSOR); 
   supplierPartNumberWaterTempSensor       =  preferences.getString("supplierPartNumberWaterTempSensor", DEFAULT_SUPPLIER_PARTNUMBER_WATER_TEMPSENSOR);
+  //update_DTCStorage();
 
-  OldOilTempCompValues[0] = preferences.getUShort("Old_sensor_Temperature_30",Old_sensor_Temperature_30);
-  OldOilTempCompValues[1] = preferences.getUShort("Old_sensor_Temperature_40",Old_sensor_Temperature_40);
-  OldOilTempCompValues[2] = preferences.getUShort("Old_sensor_Temperature_50",Old_sensor_Temperature_50);
-  OldOilTempCompValues[3] = preferences.getUShort("Old_sensor_Temperature_55",Old_sensor_Temperature_55);
-  OldOilTempCompValues[4] = preferences.getUShort("Old_sensor_Temperature_60",Old_sensor_Temperature_60);
-  OldOilTempCompValues[5] = preferences.getUShort("Old_sensor_Temperature_65",Old_sensor_Temperature_65);
-  OldOilTempCompValues[6] = preferences.getUShort("Old_sensor_Temperature_70",Old_sensor_Temperature_70);
-  OldOilTempCompValues[7] = preferences.getUShort("Old_sensor_Temperature_75",Old_sensor_Temperature_75);
-  OldOilTempCompValues[8] = preferences.getUShort("Old_sensor_Temperature_80",Old_sensor_Temperature_80);
-  OldOilTempCompValues[9] = preferences.getUShort("Old_sensor_Temperature_85",Old_sensor_Temperature_85);
-  OldOilTempCompValues[10] = preferences.getUShort("Old_sensor_Temperature_90",Old_sensor_Temperature_90);
-  OldOilTempCompValues[11] = preferences.getUShort("Old_sensor_Temperature_95",Old_sensor_Temperature_95);
-  OldOilTempCompValues[12] = preferences.getUShort("Old_sensor_Temperature_100",Old_sensor_Temperature_100);
-  OldOilTempCompValues[13] = preferences.getUShort("Old_sensor_Temperature_105",Old_sensor_Temperature_105);
-  OldOilTempCompValues[14] = preferences.getUShort("Old_sensor_Temperature_110",Old_sensor_Temperature_110);
-  OldOilTempCompValues[15] = preferences.getUShort("Old_sensor_Temperature_115",Old_sensor_Temperature_115);
+  OilTempCompValues[0] = preferences.getUShort("SENSOR_Temperature_30",SENSOR_Temperature_30);
+  OilTempCompValues[1] = preferences.getUShort("SENSOR_Temperature_40",SENSOR_Temperature_40);
+  OilTempCompValues[2] = preferences.getUShort("SENSOR_Temperature_50",SENSOR_Temperature_50);
+  OilTempCompValues[3] = preferences.getUShort("SENSOR_Temperature_55",SENSOR_Temperature_55);
+  OilTempCompValues[4] = preferences.getUShort("SENSOR_Temperature_60",SENSOR_Temperature_60);
+  OilTempCompValues[5] = preferences.getUShort("SENSOR_Temperature_65",SENSOR_Temperature_65);
+  OilTempCompValues[6] = preferences.getUShort("SENSOR_Temperature_70",SENSOR_Temperature_70);
+  OilTempCompValues[7] = preferences.getUShort("SENSOR_Temperature_75",SENSOR_Temperature_75);
+  OilTempCompValues[8] = preferences.getUShort("SENSOR_Temperature_80",SENSOR_Temperature_80);
+  OilTempCompValues[9] = preferences.getUShort("SENSOR_Temperature_85",SENSOR_Temperature_85);
+  OilTempCompValues[10] = preferences.getUShort("SENSOR_Temperature_90",SENSOR_Temperature_90);
+  OilTempCompValues[11] = preferences.getUShort("SENSOR_Temperature_95",SENSOR_Temperature_95);
+  OilTempCompValues[12] = preferences.getUShort("SENSOR_Temperature_100",SENSOR_Temperature_100);
+  OilTempCompValues[13] = preferences.getUShort("SENSOR_Temperature_105",SENSOR_Temperature_105);
+  OilTempCompValues[14] = preferences.getUShort("SENSOR_Temperature_110",SENSOR_Temperature_110);
+  OilTempCompValues[15] = preferences.getUShort("SENSOR_Temperature_115",SENSOR_Temperature_115);
 
-  OldOilLevelCompValues[0] = preferences.getUShort("Old_sensor_OilLevelEmpty",Old_sensor_OilLevelEmpty);
-  OldOilLevelCompValues[1] = preferences.getUShort("Old_sensor_OilLevel_10",Old_sensor_OilLevel_10);
-  OldOilLevelCompValues[2] = preferences.getUShort("Old_sensor_OilLevel_20",Old_sensor_OilLevel_20);
-  OldOilLevelCompValues[3] = preferences.getUShort("Old_sensor_OilLevel_30",Old_sensor_OilLevel_30);
-  OldOilLevelCompValues[4] = preferences.getUShort("Old_sensor_OilLevel_40",Old_sensor_OilLevel_40);
-  OldOilLevelCompValues[5] = preferences.getUShort("Old_sensor_OilLevel_50",Old_sensor_OilLevel_50);
-  OldOilLevelCompValues[6] = preferences.getUShort("Old_sensor_OilLevel_60",Old_sensor_OilLevel_60);
-  OldOilLevelCompValues[7] = preferences.getUShort("Old_sensor_OilLevel_70",Old_sensor_OilLevel_70);
-  OldOilLevelCompValues[8] = preferences.getUShort("Old_sensor_OilLevel_80",Old_sensor_OilLevel_80);
-  OldOilLevelCompValues[9] = preferences.getUShort("Old_sensor_OilLevel_90",Old_sensor_OilLevel_90);
-  OldOilLevelCompValues[10] = preferences.getUShort("Old_sensor_OilLevelFull",Old_sensor_OilLevelFull);
+  OilLevelCompValues[0] = preferences.getUShort("SENSOR_OilLevelEmpty",SENSOR_OilLevelEmpty);
+  OilLevelCompValues[1] = preferences.getUShort("SENSOR_OilLevel_10",SENSOR_OilLevel_10);
+  OilLevelCompValues[2] = preferences.getUShort("SENSOR_OilLevel_20",SENSOR_OilLevel_20);
+  OilLevelCompValues[3] = preferences.getUShort("SENSOR_OilLevel_30",SENSOR_OilLevel_30);
+  OilLevelCompValues[4] = preferences.getUShort("SENSOR_OilLevel_40",SENSOR_OilLevel_40);
+  OilLevelCompValues[5] = preferences.getUShort("SENSOR_OilLevel_50",SENSOR_OilLevel_50);
+  OilLevelCompValues[6] = preferences.getUShort("SENSOR_OilLevel_60",SENSOR_OilLevel_60);
+  OilLevelCompValues[7] = preferences.getUShort("SENSOR_OilLevel_70",SENSOR_OilLevel_70);
+  OilLevelCompValues[8] = preferences.getUShort("SENSOR_OilLevel_80",SENSOR_OilLevel_80);
+  OilLevelCompValues[9] = preferences.getUShort("SENSOR_OilLevel_90",SENSOR_OilLevel_90);
+  OilLevelCompValues[10] = preferences.getUShort("SENSOR_OilLevelFull",SENSOR_OilLevelFull);
 
   preferences.end();
 }
@@ -592,33 +525,68 @@ bool tft_output(int16_t x, int16_t y, uint16_t w, uint16_t h, uint16_t* bitmap)
   return 1;
 }
 
+void letDebugPinToggle()
+{
+  if(tflag==0)
+  {
+    digitalWrite(41, LOW);
+    tflag=1;
+  }else{
+    digitalWrite(41, HIGH);
+    tflag=0;
+  }
+}
+
+void convertReceivedData(bool NewData)
+{
+  if(NewData){
+    UDS_receiveString = bus_getReceiveString();
+    uint8_t i=0;
+    char tempC;
+    while(UDS_receiveString[i]!=0)
+    {
+      Serial.println(UDS_receiveString[i]);
+      String temp= (String) UDS_receiveString[i];      
+      for (int z=0;z<1;z++)
+      {
+        tempC = (char) temp[z];
+      }
+      charArrGlobal[i] = tempC;
+      Serial.print("Received Data");
+      Serial.println(charArrGlobal[i]);
+      i++;
+    }
+    NewData = false;
+  }
+}
+
+void printNumberDTC()
+{
+   if(numberOfDTCEntries()>0)
+    {
+      tft.setTextColor(GC9A01A_WHITE);
+      tft.setTextSize(1);
+      tft.setCursor(180, 30);
+      tft.print(numberOfDTCEntries());
+    }
+}
+
 void setup() {
   readEepromValues();
-  tft.init();
 
-  tft.initDMA();
-  //tft.initSPI();
-  delay(300);
-  
+	tft.begin();
+	tft.setRotation(1);
+	tft.fillScreen(GC9A01A_BLACK);
+
+ 
   //start serial connection
-  initBtConnection(Modulename);
-
-  //SerialBT = blueSerial(Serial1, true);
+  initBTConnection(Modulename);
   
   /*configure pin SignalInputPin from #define as an input and enable the internal pull-up resistor*/
   pinMode(SignalInputPin, INPUT_PULLUP);
 
   /*configure pin ISRDebugTogglePin from #define as an Output to check how often ISR is called*/
   pinMode(ISRDebugTogglePin, OUTPUT);
-
-  /*configure pin OilLevelLED from #define as an Output to proof that oil Level is ok*/
-  //pinMode(OilLevelLED, OUTPUT);
-
-  /*configure pin OilTemperatureLED from #define as an Output to proof that oil Temperature is ok*/
-  //pinMode(OilTemperatureLED, OUTPUT);
-
-  /*configure Pin for extra Output ok*/
-  pinMode(OutputPin, OUTPUT);
 
   // Set timer frequency to 1Mhz
   timer = timerBegin(timerfrequency);
@@ -630,13 +598,13 @@ void setup() {
   // Repeat the alarm (third parameter) with unlimited count = 0 (fourth parameter).
   timerAlarm(timer, 1000, true, 0);
 
-  SerialBT.onData(getBTData);
   /* Design Reason Background is Dark all Text is White*/
-  
-  tft.fillScreen(GC9A01A_BLACK);
-  tft.setTextColor(GC9A01A_WHITE);
+  pinMode(41, OUTPUT);
+  digitalWrite(41, HIGH);
 
-    // The jpeg image can be scaled by a factor of 1, 2, 4, or 8
+  delay(30);
+
+  // The jpeg image can be scaled by a factor of 1, 2, 4, or 8
   TJpgDec.setJpgScale(1);
 
   // The byte order can be swapped (set true for TFT_eSPI)
@@ -644,20 +612,20 @@ void setup() {
 
   // The decoder must be given the exact name of the rendering function above
   TJpgDec.setCallback(tft_output);
+
+  checkcoding
 }
 
-
 void loop() {
-  //ArduinoOTA.handle();
-  portENTER_CRITICAL(&timerMux);
+  letDebugPinToggle();
+  loopfunction();
   orderImpulse(cntRawArr);
-  portEXIT_CRITICAL(&timerMux);
-
   convertImpulseToPercentage((uint16_t)returnArray[1], (uint16_t)returnArray[3],(uint8_t)session);
   sendInfosToBT(oilTemperature, oilLevelPercentage,returnArray);
   //TempToggle = showLevelAndTempAtLED(TempToggle,oilLevelPercentage,oilTemperature);
-  analyse_BT_Protocol(BT_rx_buffer);
- 
+  NewData = bus_AreNewDataThere();
+  convertReceivedData(NewData);
+  analyse_BT_Protocol(charArrGlobal);
   controlOfDisplay();
   lastOilTemp = oilTemperature;
   lastOilLevel = oilLevelPercentage;
