@@ -105,6 +105,9 @@ The Services 0x22 (ReadDataByIdentifier): has the following Subfunctions
 
 - 0x22 0xF1 0xAB                            Read SW-Version                     (Returns the SW Version)
 - 0x22 0xF1 0x86                            Read Session                        (Returns  the actucal Session is on (true) or not (false))
+- 0x22 0xF1 0x90                            Read Name of Central Chip           (Returns the Modelname of the central Mikrocontroller e.g. ESP32,ESP32_S3)
+- 0x22 0xF1 0x91                            Read OEMPartNumber of OilSensor     (Returns the Partnumber of the OilTempsensor used by the OEM)
+- 0x22 0xF1 0x92                            Read OEMPartNumber of WaterSensor   (Returns the Partnumber of the WaterTempsensor used by the OEM)
 - 0x22 0xF1 0x97                            Read Systemname                     (Returns the SystemName of the Module)
 - 0x22 0x06 0x00                            Read DebugOilTemperature            Returns the Value of the OilLevel in Degree Celsius which is used in Debugmode
 - 0x22 0x06 0x01                            Read DebugOilLevelPercentage        Returns the Value of the OilLevel in percent which is used in Debugmode
