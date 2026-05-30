@@ -112,7 +112,9 @@ The Services 0x22 (ReadDataByIdentifier): has the following Subfunctions
 
 - 0x22 0x07 0x02           Read Number of DTC Entries                      Returns the number of stored DTCs
 - 0x22 0x07 0x03           Read Status of DTC-Bits                         Returns the complete uint32_t DTC Storage and shows which DTCs bits are Active. The Bitmask is defined                                                                            in dtc_oilsensor_defines.h
-- 
+
+
+  
 
 
 
