@@ -20,6 +20,8 @@
 #include <iostream>
 #include <string.h>
 #include <string>
+#include "buzzer_alarm.h"
+
 
 Preferences preferences;
 
@@ -36,6 +38,9 @@ uint8_t lastOilLevel                    = 0;
 uint8_t brandSelector                   = BRAND_VW;
 uint8_t oilSensorSelector               = SENSOR_OILTEMPSENSOR_UNDEFINED;
 uint8_t waterSensorSelector             = SENSOR_WATERTEMPSENSOR_UNDEFINED;
+
+
+
 
 hw_timer_t *timer                                 = NULL; 
 portMUX_TYPE timerMux                             =  portMUX_INITIALIZER_UNLOCKED;
@@ -118,15 +123,17 @@ void ARDUINO_ISR_ATTR onTimer() {
   if ((signalinput == 0x01) && (Impuls_1_High == false) && (Impuls_1_Low == false) && (Impuls_2_High == false) && (Impuls_2_Low == false)) {
     //  first high signal
     // T1 
+    cnt =1;
     Impuls_1_High = true;
     TimeoutSensorDetected = false;
-    newMeasurementFinished = false;
+    digitalWrite(9, HIGH);
 
   } else if ((signalinput == 0x00) && (Impuls_1_High == true) && (Impuls_1_Low == false) && (Impuls_2_High == false) && (Impuls_2_Low == false)) {
     //  first low signal 
     // T2 
     Impuls_1_Low = true;
     arrayNumberImpuls[0] = cnt;
+
 
   } else if ((signalinput == 0x01) && (Impuls_1_High == true) && (Impuls_1_Low == true) && (Impuls_2_High == false) && (Impuls_2_Low == false)) {
     // 2nd high signal 
@@ -144,8 +151,8 @@ void ARDUINO_ISR_ATTR onTimer() {
     Impuls_2_High = false;
     Impuls_1_Low  = false;
     Impuls_2_Low  = false;
+    
     arrayNumberImpuls[3] = cnt;
-    cnt = 1;
     newMeasurementFinished = true;
   }
  
@@ -164,11 +171,12 @@ void ARDUINO_ISR_ATTR onTimer() {
     TimeoutSensorDetected = true;
     cnt = 1;
     newMeasurementFinished = false;
+    //alarmOilSensorTO();
   }
 }
 
 
-bool  orderImpulse(uint16_t inputArr[],bool newData) {
+bool  orderImpulse(bool newData) {
   bool retval = false;
   if(newData){
   /* This Method orders the measured impulses into the correct sequence..*/
@@ -178,10 +186,10 @@ bool  orderImpulse(uint16_t inputArr[],bool newData) {
   /* SerialBT.print(testval & 0xFF);       -> 0xF4 */
  
   uint16_t tempArray[4];
-  tempArray[0] = inputArr[0];
-  tempArray[1] = inputArr[1] - inputArr[0];
-  tempArray[2] = inputArr[2] - inputArr[1];
-  tempArray[3] = inputArr[3] - inputArr[2];
+  tempArray[0] = arrayNumberImpuls[0];
+  tempArray[1] = arrayNumberImpuls[1] - arrayNumberImpuls[0];
+  tempArray[2] = arrayNumberImpuls[2] - arrayNumberImpuls[1];
+  tempArray[3] = arrayNumberImpuls[3] - arrayNumberImpuls[2];
 
     /*detect Big LOW T5*/
     if (tempArray[0] > 100) {
@@ -211,6 +219,8 @@ bool  orderImpulse(uint16_t inputArr[],bool newData) {
     }
     retval = true;
   }
+  newMeasurementFinished = false;
+  digitalWrite(9,LOW);
   return retval;
 }
 
@@ -330,7 +340,7 @@ void showOilLevelNormalOperation(uint8_t percentageOillevel,bool initflag)
         tft.print("C");
         setDTC(DTC_BIT_07_OILTEMP_TO_HIGH);
       }
-      printNumberDTC();
+      //printNumberDTC();
     
     }else{
       if(initflag==false)
@@ -602,6 +612,10 @@ void setup() {
 
   /*configure pin ISRDebugTogglePin from #define as an Output to check how often ISR is called*/
   pinMode(ISRDebugTogglePin, OUTPUT);
+  
+  pinMode(BUZZER_PIN, OUTPUT);
+  pinMode(9, OUTPUT);
+  pinMode(DEBUG_TOGGLEPIN,OUTPUT);
 
   // Set timer frequency to 1Mhz
   timer = timerBegin(timerfrequency);
@@ -614,8 +628,6 @@ void setup() {
   timerAlarm(timer, 1000, true, 0);
 
   /* Design Reason Background is Dark all Text is White*/
-  pinMode(41, OUTPUT);
-  digitalWrite(41, HIGH);
 
   delay(30);
 
@@ -634,10 +646,10 @@ void setup() {
 void loop() {
   letDebugPinToggle();
   loopfunction();
-  portENTER_CRITICAL(&timerMux);
-  newOilSensorImpulse = orderImpulse(arrayNumberImpuls,newMeasurementFinished);
-  portEXIT_CRITICAL(&timerMux);
-  convertImpulseToPercentage((uint16_t)returnArray[1], (uint16_t)returnArray[3],(uint8_t)session,newOilSensorImpulse);
+  
+  newOilSensorImpulse = orderImpulse(newMeasurementFinished);
+  
+  convertImpulseToPercentage((uint16_t)returnArray[1], (uint16_t)returnArray[3],(uint8_t)session,newOilSensorImpulse,TimeoutSensorDetected);
   sendInfosToBT(oilTemperature, oilLevelPercentage,returnArray);
   //TempToggle = showLevelAndTempAtLED(TempToggle,oilLevelPercentage,oilTemperature);
   newBTData = bus_AreNewDataThere();

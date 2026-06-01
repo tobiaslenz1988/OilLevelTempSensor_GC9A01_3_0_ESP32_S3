@@ -3,7 +3,6 @@
 #include "oilsensor.h"
 #include "nrc_uds_protocol.h"
 
-extern bool TimeoutSensorDetected;
 
 extern uint8_t oilTemperature;
 extern uint8_t oilLevelPercentage;
@@ -16,15 +15,15 @@ extern uint16_t OilTempCompValues[16];
 extern uint16_t OilLevelCompValues[11];
 
 
-
 /* This methods converts the received impulses to an Percentage for OilLevel and Oil Temperature*/
-void convertImpulseToPercentage(uint16_t TemperatureImpulses, uint16_t LevelImpulses,uint8_t session,bool newData) {
+void convertImpulseToPercentage(uint16_t TemperatureImpulses, uint16_t LevelImpulses,uint8_t session,bool newData,bool TimeoutSensorDetected) {
   if (session == UDS_Session_Control_Default_Session) 
   { /* Debug of... normal Operation*/
     if(TimeoutSensorDetected == false)
     {
         if(newData){
-            if (LevelImpulses > OilLevelCompValues[10]) { oilLevelPercentage = OilLevelPercentageErrorValue; }else
+            //if (LevelImpulses > OilLevelCompValues[10]) { oilLevelPercentage = OilLevelPercentageErrorValue; }else
+            if (LevelImpulses > OilLevelCompValues[10]) { oilLevelPercentage = 78; }else
             if (LevelImpulses = OilLevelCompValues[10]) { oilLevelPercentage = 100; }else
             if (LevelImpulses >= OilLevelCompValues[9]) { oilLevelPercentage = 90; }else
             if (LevelImpulses >= OilLevelCompValues[8]) { oilLevelPercentage = 80; }else
@@ -59,8 +58,9 @@ void convertImpulseToPercentage(uint16_t TemperatureImpulses, uint16_t LevelImpu
         }
     }else{
       /* if Oil Sensor is disconnected  and TO is detected */
-      oilTemperature      = OilTemperaturePercentageErrorValue;
-      oilLevelPercentage  = OilLevelPercentageErrorValue;
+      //oilTemperature      = OilTemperaturePercentageErrorValue;
+      oilTemperature      = 81;
+      oilLevelPercentage  = 81;
     }
   } else if (session == UDS_Session_Control_Development_Session || session == UDS_Session_Control_Extended_Session){
     /*Debug On*/
