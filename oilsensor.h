@@ -47,7 +47,6 @@
 
 
 extern bool TimeoutSensorDetected;
-extern bool NewOilSensorEquipped; 
 
 extern uint8_t oilTemperature;
 extern uint8_t oilLevelPercentage ;
@@ -60,6 +59,6 @@ extern uint16_t OilTempCompValues[16];
 extern uint16_t OilLevelCompValues[11];
 extern uint16_t NewOilTempCompValues[16];
 extern uint16_t NewOilLevelCompValues[11];
-void convertImpulseToPercentage(uint16_t cntRawData_Temp, uint16_t cntRawData_Level,uint8_t session);
+void convertImpulseToPercentage(uint16_t cntRawData_Temp, uint16_t cntRawData_Level,uint8_t session,bool newData);
 
 #endif /* OILSENSOR_COMMON_H */

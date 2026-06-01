@@ -52,7 +52,7 @@
  #define UDS_ECU_Reset_HardReset                                    0x01 
  #define UDS_ECU_Reset_KeyOnOffReset                                0x02
  #define UDS_ECU_Reset_SoftReset                                    0x03
- 
+ #define UDS_NRC_CODE                                               0x7F
  
  #define HEXCODE_BIT1_READ_IDENT 0xF1
  

@@ -32,7 +32,7 @@ void delete_BT_buffer(void) { /*
 
 void analyse_BT_Protocol(char receive_BT_Array[]) {
   //Serial.println(receive_BT_Array[]);
-  if (NewData == true) {
+  if (newBTData == true) {
     /*Command to read something*/
       if (receive_BT_Array[0] == UDS_READ_DATA_BY_IDENTIFIER) {
         uint8_t posResponse = (UDS_READ_DATA_BY_IDENTIFIER + 0x40);
@@ -64,12 +64,8 @@ void analyse_BT_Protocol(char receive_BT_Array[]) {
           /* 0x22 0xF1 0x90 */
           /* Get Name of Central Chip */
           if ((receive_BT_Array[1] == 0xF1) && (receive_BT_Array[2] == 0x90)) {
-            uint8_t i = 0;
-            while (HWModelleName[i] != '-') {
-              i = i + 1;
-            }
-            uint8_t len = 3+i;
-            uint8_t data[len];
+            uint8_t len = sizeof(HWModelleName) / sizeof(HWModelleName[0]);
+            uint8_t data[len+3];
             data[0] = posResponse;
             data[1] = 0xF1;
             data[2] = 0x90;
@@ -81,14 +77,10 @@ void analyse_BT_Protocol(char receive_BT_Array[]) {
           } else
 
           /* 0x22 0xF1 0x91 */
-          /* Get VWPartNumber of OilTempSensor */
+          /* Get OEMPartNumber of OilTempSensor */
           if ((receive_BT_Array[1] == 0xF1) && (receive_BT_Array[2] == 0x91)) {
-            uint8_t i = 0;
-            while (oemPartNumberOilTempSensor[i] != '-') {
-              i = i + 1;
-            }
-            uint8_t len = 3+i;
-            uint8_t data[len];
+            uint8_t len = sizeof(oemPartNumberOilTempSensor) / sizeof(oemPartNumberOilTempSensor[0]);
+            uint8_t data[len+3];
             data[0] = posResponse;
             data[1] = 0xF1;
             data[2] = 0x91;
@@ -100,14 +92,10 @@ void analyse_BT_Protocol(char receive_BT_Array[]) {
           } else
               
           /* 0x22 0xF1 0x92 */
-          /* Get PartNumber of WaterTempSensor */
+          /* Get OEMPartNumber of WaterTempSensor */
           if ((receive_BT_Array[1] == 0xF1) && (receive_BT_Array[2] == 0x92)) {
-            uint8_t i = 0;
-            while (oemPartNumberWaterTempSensor[i] != '-') {
-              i = i + 1;
-            }
-            uint8_t len = 3+i;
-            uint8_t data[len];
+            uint8_t len = sizeof(oemPartNumberWaterTempSensor) / sizeof(oemPartNumberWaterTempSensor[0]);
+            uint8_t data[len+3];
             data[0] = posResponse;
             data[1] = 0xF1;
             data[2] = 0x92;
@@ -120,14 +108,10 @@ void analyse_BT_Protocol(char receive_BT_Array[]) {
           } else
 
           /* 0x22 0xF1 0x93 */
-          /* set SupplierPartNumber of OilTempSensor */
+          /* get SupplierPartNumber of OilTempSensor */
           if ((receive_BT_Array[1] == 0xF1) && (receive_BT_Array[2] == 0x93)) {
-            uint8_t i = 0;
-            while (supplierPartNumberOilTempSensor[i] != '-') {
-              i = i + 1;
-            }
-            uint8_t len = 3+i;
-            uint8_t data[len];
+            uint8_t len = sizeof(supplierPartNumberOilTempSensor) / sizeof(supplierPartNumberOilTempSensor[0]);
+            uint8_t data[len+3];
             data[0] = posResponse;
             data[1] = 0xF1;
             data[2] = 0x93;
@@ -136,20 +120,30 @@ void analyse_BT_Protocol(char receive_BT_Array[]) {
               data[3+i] = (uint8_t)supplierPartNumberOilTempSensor[i];
             }
             BUS_output(data, len);
-
-
           } else
+
+
+          /* 0x22 0xF1 0x94 */
+          /* get SupplierPartNumber of WaterTempSensor */
+          if ((receive_BT_Array[1] == 0xF1) && (receive_BT_Array[2] == 0x94)) {
+            uint8_t len = sizeof(supplierPartNumberWaterTempSensor) / sizeof(supplierPartNumberWaterTempSensor[0]);
+            uint8_t data[len+3];
+            data[0] = posResponse;
+            data[1] = 0xF1;
+            data[2] = 0x94;
+            for(int i=0;i<len;i++)
+            {
+              data[3+i] = (uint8_t)supplierPartNumberWaterTempSensor[i];
+            }
+            BUS_output(data, len);
+          } else
+
 
           /* 0x22 0xF1 0x97 */
           /* get Systemname */
           if ((receive_BT_Array[1] == 0xF1) && (receive_BT_Array[2] == 0x97)) {
-            uint8_t i = 0;
-            while (Modulename[i] != '-') 
-            {
-               i = i + 1;
-            }
-            uint8_t len = 3+i;
-            uint8_t data[len];
+            uint8_t len = sizeof(Modulename) / sizeof(Modulename[0]);
+            uint8_t data[len+3];
             data[0] = posResponse;
             data[1] = 0xF1;
             data[2] = 0x97;
@@ -158,187 +152,166 @@ void analyse_BT_Protocol(char receive_BT_Array[]) {
               data[3+i] = (uint8_t)Modulename[i];
             }
             BUS_output(data, len);
-
           } else
 
-            /* This part should read the coding
-            /* 0x22 0x06 0x00 ......*/
-            if ((receive_BT_Array[1] == 0x06) && (receive_BT_Array[2] == 0x00)) {
-                uint8_t data[5];
-                data[0] = posResponse;
-                data[1] = 0x06;
-                data[2] = 0x00;
-                data[3] = brandSelector;
-                data[4] = NewOilSensorEquipped;
-                BUS_output(data, 5);
+          /* This part should read the coding
+          /* 0x22 0x06 0x00 ......*/
+          if ((receive_BT_Array[1] == 0x06) && (receive_BT_Array[2] == 0x00)) {
+            uint8_t data[5];
+            data[0] = posResponse;
+            data[1] = 0x06;
+            data[2] = 0x00;
+            data[3] = brandSelector;
+            data[4] = 0x00;//reserved
+            BUS_output(data, 5);
+          } else
+            
+          /* 0x22 0x06 0x01 */
+          /* This part should get the Debugvalue for the OilTemperature */
+          if ((receive_BT_Array[1] == 0x06) && (receive_BT_Array[2] == 0x01)) {          
+            uint8_t data[4];
+            data[0] = posResponse;
+            data[1] = 0x06;
+            data[2] = 0x01;
+            data[3] = testValue_oilTemperature;
+            BUS_output(data, 4);
+          } else
 
+          /* 0x22 0x06 0x02 */
+          /* This part should get the Debugvalue for the OilLevel */
+          if ((receive_BT_Array[1] == 0x06) && (receive_BT_Array[2] == 0x02)) {
+            uint8_t data[4];
+            data[0] = posResponse;
+            data[1] = 0x06;
+            data[2] = 0x02;
+            data[3] = testValue_oilLevelPercentage;
+            BUS_output(data, 4);
+          } else
 
-            } else
-            /* 0x22 0x06 0x01 */
-            /* This part should get the Debugvalue for the OilTemperature */
-            if ((receive_BT_Array[1] == 0x06) && (receive_BT_Array[2] == 0x01)) {          
-              uint8_t data[4];
-              data[0] = posResponse;
-              data[1] = 0x06;
-              data[2] = 0x01;
-              data[3] = testValue_oilTemperature;
-              BUS_output(data, 4);
+          /* 0x22 0x06 0x03 */
+          /* Returns the OilTemperature  in Degree Celsius which is used by the SW*/
+          if ((receive_BT_Array[1] == 0x06) && (receive_BT_Array[2] == 0x03)) {
+            uint8_t data[4];
+            data[0] = posResponse;
+            data[1] = 0x06;
+            data[2] = 0x03;
+            data[3] = oilTemperature;
+            BUS_output(data, 4);
+          } else
 
-            } else
+          /* 0x22 0x06 0x04 */
+          /* Returns the Oillevel in percent which is used by the SW*/
+          if ((receive_BT_Array[1] == 0x06) && (receive_BT_Array[2] == 0x04)) {
+            uint8_t data[4];
+            data[0] = posResponse;
+            data[1] = 0x06;
+            data[2] = 0x04;
+            data[3] = oilLevelPercentage;
+            BUS_output(data, 4);
+          } else
 
-            /* 0x22 0x06 0x02 */
-            /* This part should get the Debugvalue for the OilLevel */
-            if ((receive_BT_Array[1] == 0x06) && (receive_BT_Array[2] == 0x02)) {
-              uint8_t data[4];
-              data[0] = posResponse;
-              data[1] = 0x06;
-              data[2] = 0x02;
-              data[3] = testValue_oilLevelPercentage;
-              BUS_output(data, 4);
-            } else
-            /* 0x22 0x06 0x03 */
-            /* Returns the OilTemperature  in Degree Celsius which is used by the SW*/
-            if ((receive_BT_Array[1] == 0x06) && (receive_BT_Array[2] == 0x03)) {
-              uint8_t data[4];
-              data[0] = posResponse;
-              data[1] = 0x06;
-              data[2] = 0x03;
-              data[3] = oilTemperature;
-              BUS_output(data, 4);
-            } else
-            /* 0x22 0x06 0x04 */
-            /* Returns the Oillevel in percent which is used by the SW*/
-            if ((receive_BT_Array[1] == 0x06) && (receive_BT_Array[2] == 0x04)) {
-              uint8_t data[4];
-              data[0] = posResponse;
-              data[1] = 0x06;
-              data[2] = 0x04;
-              data[3] = oilLevelPercentage;
-              BUS_output(data, 4);
-            } else
-            /* 0x22 0x06 0x0A */
-            /* get the Brandvalue */
-            if ((receive_BT_Array[1] == 0x06) && (receive_BT_Array[2] == 0x0A)) {
-              uint8_t data[4];
-              data[0] = posResponse;
-              data[1] = 0x06;
-              data[2] = 0x0A;
-              data[3] = brandSelector;
-              BUS_output(data, 4);
-            } else
-            /* 0x22 0x06 0x0B */
-            /* get ExtraOutputPin flag*/
-            if ((receive_BT_Array[1] == 0x06) && (receive_BT_Array[2] == 0x0B)) {
-              uint8_t data[4];
-              data[0] = posResponse;
-              data[1] = 0x06;
-              data[2] = 0x0B;
-              data[3] = statusOfExtraOutputPin;
-              BUS_output(data, 4);
-            } else
-            /* 0x22 0x06 0x0C */
-            /* get OldSensorNewSensor flag*/
-            if ((receive_BT_Array[1] == 0x06) && (receive_BT_Array[2] == 0x0C)) {
-              uint8_t data[4];
-              data[0] = posResponse;
-              data[1] = 0x06;
-              data[2] = 0x0C;
-              data[3] = NewOilSensorEquipped;
-              BUS_output(data, 4);
-            } else
-            /* 0x22 0x07 0x00 */
-            /* get Oiltemperature compare values for OldSensor */
-            if ((receive_BT_Array[1] == 0x07) && (receive_BT_Array[2] == 0x00)) {    
-              uint8_t i = 0;
-              uint8_t tempvar;
-              uint8_t sizeOfArr = sizeof(OilTempCompValues) / sizeof(OilTempCompValues[0]);
-              uint8_t data[(3+(sizeOfArr*2))];
-              data[0] = posResponse;
-              data[1] = 0x07;
-              data[2] = 0x00;
+          /* 0x22 0x06 0x0A */
+          /* get the Brandvalue */
+          if ((receive_BT_Array[1] == 0x06) && (receive_BT_Array[2] == 0x0A)) {
+            uint8_t data[4];
+            data[0] = posResponse;
+            data[1] = 0x06;
+            data[2] = 0x0A;
+            data[3] = brandSelector;
+            BUS_output(data, 4);
+          } else
+
+          /* 0x22 0x06 0x0B */
+          /* get ExtraOutputPin flag*/
+          if ((receive_BT_Array[1] == 0x06) && (receive_BT_Array[2] == 0x0B)) {
+            uint8_t data[4];
+            data[0] = posResponse;
+            data[1] = 0x06;
+            data[2] = 0x0B;
+            data[3] = statusOfExtraOutputPin;
+            BUS_output(data, 4);
+          } else
+
+          /* 0x22 0x07 0x00 */
+          /* get Oiltemperature compare values for Sensor */
+          if ((receive_BT_Array[1] == 0x07) && (receive_BT_Array[2] == 0x00)) {    
+            uint8_t i = 0;
+            uint8_t tempvar;
+            uint8_t sizeOfArr = sizeof(OilTempCompValues) / sizeof(OilTempCompValues[0]);
+            uint8_t data[(3+(sizeOfArr*2))];
+            data[0] = posResponse;
+            data[1] = 0x07;
+            data[2] = 0x00;
               
-              for (i = 0; i < (sizeOfArr); i+2){
-                /* As example testval =         500 == 0x01F4    */
-                /* BUS_output((uint8_t*)testval >> 8);         -> 0x01 */
-                /* BUS_output((uint8_t*)testval & 0xFF);       -> 0xF4 */
+            for (i = 0; i < (sizeOfArr); i+2){
                 data[3+i] = (OilTempCompValues[i] >> 8);
-                //BUS_output((uint8_t*)tempvar);
                 data[4+i] = (OilTempCompValues[i] & 0xFF);
-                //BUS_output((uint8_t*)tempvar);
-              }
-                BUS_output(data, 3+(sizeOfArr*2));
-            } else
-
-            /* 0x22 0x07 0x01 */
-            /* get Oillevel compare values for OldSensor*/
-            if ((receive_BT_Array[1] == 0x07) && (receive_BT_Array[2] == 0x01)) {
-              uint8_t i = 0;
-              uint8_t tempvar;
-              uint8_t sizeOfArr = sizeof(OilLevelCompValues) / sizeof(OilLevelCompValues[0]);
-              uint8_t data[3+(sizeOfArr*2)];
-              data[0] = posResponse;
-              data[1] = 0x07;
-              data[2] = 0x01;
-              for (i = 0; i < (sizeOfArr*2); i+2) 
-              {
-                /* As example testval =         500 == 0x01F4    */
-                /* BUS_output((uint8_t*)testval >> 8);         -> 0x01 */
-                /* BUS_output((uint8_t*)testval & 0xFF);       -> 0xF4 */
-                data[3+i] = (OilLevelCompValues[i] >> 8);
-                //BUS_output((uint8_t*)tempvar);
-                data[4+i] = (OilLevelCompValues[i] & 0xFF);
-                //BUS_output((uint8_t*)tempvar);
-              }
-              BUS_output(data, 3+(sizeOfArr*2));
-
-
-            } else
-            /* 0x22 0x07 0x02 */
-            /* Number of DTC Entries */
-            if ((receive_BT_Array[1] == 0x07) && (receive_BT_Array[2] == 0x02)) {
-              uint8_t data[4];
-              data[0] = posResponse;
-              data[1] = 0x07;
-              data[2] = 0x02;
-              data[3] = numberOfDTCEntries();
-              BUS_output(data, 4);
-
-            } else
-
-            /* 0x22 0x07 0x03 */
-            /* tbd */
-            if ((receive_BT_Array[1] == 0x07) && (receive_BT_Array[2] == 0x03)) {
-              uint8_t data[3];
-              //uint32_t dtcstatus = getDTCStorageObject();
-              uint32_t dtcstatus = 0x12345678;
-              data[0] = posResponse;
-              data[1] = 0x07;
-              data[2] = 0x03;
-              data[3] = dtcstatus & 0xFF;                  // Niedrigstes Byte (0x78)
-              data[4] = (dtcstatus >> 8) & 0xFF;           // Zweites Byte (0x56)
-              data[5] = (dtcstatus >> 16) & 0xFF;          // Drittes Byte (0x34)
-              data[6] = (dtcstatus >> 24) & 0xFF;          // Höchstes Byte (0x12)
-              BUS_output(data, 7);
-
-            } else 
-
-            /* 0x22 0x07 0x04 */
-            /* tbd */
-            if ((receive_BT_Array[1] == 0x07) && (receive_BT_Array[2] == 0x04)) {
-              uint8_t data[3];
-              data[0] = posResponse;
-              data[1] = 0x07;
-              data[2] = 0x04;
-              BUS_output(data, 3);
-
-            } else {
-
-              uint8_t data[3];
-              data[0] = 0x7F;
-              data[1] = UDS_READ_DATA_BY_IDENTIFIER;
-              data[2] = UDS_NRC_requestOutOfRange;
-              BUS_output(data, 3);
             }
+            BUS_output(data, 3+(sizeOfArr*2));
+          } else
+
+          /* 0x22 0x07 0x01 */
+          /* get Oillevel compare values for Sensor*/
+          if ((receive_BT_Array[1] == 0x07) && (receive_BT_Array[2] == 0x01)) {
+            uint8_t i = 0;
+            uint8_t tempvar;
+            uint8_t sizeOfArr = sizeof(OilLevelCompValues) / sizeof(OilLevelCompValues[0]);
+            uint8_t data[3+(sizeOfArr*2)];
+            data[0] = posResponse;
+            data[1] = 0x07;
+            data[2] = 0x01;
+            for (i = 0; i < (sizeOfArr*2); i+2) 
+            {
+              data[3+i] = (OilLevelCompValues[i] >> 8);
+              data[4+i] = (OilLevelCompValues[i] & 0xFF);
+            }
+            BUS_output(data, 3+(sizeOfArr*2));
+          } else
+              
+          
+          /* 0x22 0x07 0x02 */
+          /* Number of DTC Entries */
+          if ((receive_BT_Array[1] == 0x07) && (receive_BT_Array[2] == 0x02)) {
+            uint8_t data[4];
+            data[0] = posResponse;
+            data[1] = 0x07;
+            data[2] = 0x02;
+            data[3] = numberOfDTCEntries();
+            BUS_output(data, 4);
+          } else
+
+          /* 0x22 0x07 0x03 */
+          /* get Status of DTC Storage */
+          if ((receive_BT_Array[1] == 0x07) && (receive_BT_Array[2] == 0x03)) {
+            uint8_t data[3];
+            uint32_t dtcstatus = getDTCStorageObject();
+              //uint32_t dtcstatus = 0x12345678;
+            data[0] = posResponse;
+            data[1] = 0x07;
+            data[2] = 0x03;
+            data[3] = dtcstatus & 0xFF;                  // Niedrigstes Byte (0x78)
+            data[4] = (dtcstatus >> 8) & 0xFF;           // Zweites Byte (0x56)
+            data[5] = (dtcstatus >> 16) & 0xFF;          // Drittes Byte (0x34)
+            data[6] = (dtcstatus >> 24) & 0xFF;          // Höchstes Byte (0x12)
+            BUS_output(data, 7);
+          } else 
+
+          /* 0x22 0x07 0x04 */
+          /* Reserved */
+          if ((receive_BT_Array[1] == 0x07) && (receive_BT_Array[2] == 0x04)) {
+            uint8_t data[3];
+            data[0] = posResponse;
+            data[1] = 0x07;
+            data[2] = 0x04;
+            BUS_output(data, 3);
+          } else {
+            /* For the case that the requested RDID is not implemented */
+            uint8_t data[3];
+            data[0] = UDS_NRC_CODE;
+            data[1] = UDS_READ_DATA_BY_IDENTIFIER;
+            data[2] = UDS_NRC_requestOutOfRange;
+            BUS_output(data, 3);
+          }
       } else
 
         /*Command to write something*/
@@ -350,25 +323,47 @@ void analyse_BT_Protocol(char receive_BT_Array[]) {
           /* set Name of central chip */
           if ((receive_BT_Array[1] == 0xF1) && (receive_BT_Array[2] == 0x90)) 
           {
-            uint8_t i;
-            String tempStr;
-            HWModelleName = { '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-' };
-            uint8_t length_of_name = receive_BT_Array[3];
-            for (i = 0; i < length_of_name; i++) 
+            if((session == UDS_Session_Control_Extended_Session )|| (session == UDS_Session_Control_Development_Session ) )
             {
-              tempStr.concat((char)receive_BT_Array[4 + i]);
-              HWModelleName[i] = receive_BT_Array[4 + i];
-            }
+              uint8_t i;
+              String tempStr;
+              HWModelleName = DEFAULT_HWMODELLNAME;
+              uint8_t length_of_name = receive_BT_Array[3];
+              if(length_of_name<=15){
+                for (i = 0; i < length_of_name; i++) 
+                {
+                  tempStr.concat((char)receive_BT_Array[4 + i]);
+                  HWModelleName[i] = receive_BT_Array[4 + i];
+                }
 
-            preferences.begin(EEPROMNameSpace, false);
-            preferences.putString("HWModuleName", tempStr);
-            preferences.end();
-            uint8_t data[3];
-            data[0] = posResponse;
-            data[1] = 0xF1;
-            data[2] = 0x90;
-            BUS_output(data, 3);
+                preferences.begin(EEPROMNameSpace, false);
+                preferences.putString("HWModuleName", tempStr);
+                preferences.end();
+
+                uint8_t data[3];
+                data[0] = posResponse;
+                data[1] = 0xF1;
+                data[2] = 0x90;
+                BUS_output(data, 3);
+              }else{
+                /* if Length of HWModellname of Chip is more than 15 Character */
+                uint8_t data[3];
+                data[0] = UDS_NRC_CODE;
+                data[1] = UDS_WRITE_DATA_BY_IDENTIFIER;
+                data[2] = UDS_NRC_incorrectMessageLengthOrInvalidFormat;
+                BUS_output(data, 3);
+              }
+            }else{
+              /* Session not correct for writing the Modelname*/
+              uint8_t data[3];
+              data[0] = UDS_NRC_CODE;
+              data[1] = UDS_WRITE_DATA_BY_IDENTIFIER;
+              data[2] = UDS_NRC_subFunctionNotSupportedInActiveSession;
+              BUS_output(data, 3);
+            }
           } else
+
+          
           /* 0x2E 0xf1 0x91 */
           /* set VWPartNumber of OilTempSensor */
           if ((receive_BT_Array[1] == 0xF1) && (receive_BT_Array[2] == 0x91)) {
@@ -489,7 +484,7 @@ void analyse_BT_Protocol(char receive_BT_Array[]) {
               BUS_output(data, 3);
             } else {
               uint8_t data[3];
-              data[0] = 0x7F;
+              data[0] = UDS_NRC_CODE;
               data[1] = UDS_WRITE_DATA_BY_IDENTIFIER;
               data[2] = UDS_NRC_incorrectMessageLengthOrInvalidFormat;
               BUS_output(data, 3);
@@ -499,9 +494,12 @@ void analyse_BT_Protocol(char receive_BT_Array[]) {
           /* This part should set the coding
           /* 0x2E 0x06 0x00 0x??......*/
           if ((receive_BT_Array[1] == 0x06) && (receive_BT_Array[2] == 0x00)) {
+
             if ((receive_BT_Array[3] != NULL) && (receive_BT_Array[4] != NULL) && (receive_BT_Array[5] != NULL)) {
               brandSelector = receive_BT_Array[3];
-              NewOilSensorEquipped = (bool)receive_BT_Array[4];
+              brandSelector = receive_BT_Array[3];
+              brandSelector = receive_BT_Array[3];
+
               uint8_t data[3];
               data[0] = posResponse;
               data[1] = 0x06;
@@ -510,7 +508,7 @@ void analyse_BT_Protocol(char receive_BT_Array[]) {
             } else {
               uint8_t data[3];
               data[0] = posResponse;
-              data[1] = 0x2E;
+              data[1] = UDS_WRITE_DATA_BY_IDENTIFIER;
               data[2] = UDS_NRC_incorrectMessageLengthOrInvalidFormat;
               BUS_output(data, 3);
             }
@@ -524,8 +522,8 @@ void analyse_BT_Protocol(char receive_BT_Array[]) {
             val = receive_BT_Array[3];
             if (val == NULL) {
               uint8_t data[3];
-              data[0] = 0x7f;
-              data[1] = 0x2E;
+              data[0] = UDS_NRC_CODE;
+              data[1] = UDS_WRITE_DATA_BY_IDENTIFIER;
               data[2] = UDS_NRC_incorrectMessageLengthOrInvalidFormat;
               BUS_output(data, 3);
             } else {
@@ -545,8 +543,8 @@ void analyse_BT_Protocol(char receive_BT_Array[]) {
             if (val == NULL) 
             {
               uint8_t data[3];
-              data[0] = 0x7f;
-              data[1] = 0x2E;
+              data[0] = UDS_NRC_CODE;
+              data[1] = UDS_WRITE_DATA_BY_IDENTIFIER;
               data[2] = UDS_NRC_incorrectMessageLengthOrInvalidFormat;
               BUS_output(data, 3);
             } else {
@@ -566,8 +564,8 @@ void analyse_BT_Protocol(char receive_BT_Array[]) {
             val = receive_BT_Array[3];
             if (val == NULL) {
               uint8_t data[3];
-              data[0] = 0x7f;
-              data[1] = 0x2e;
+              data[0] = UDS_NRC_CODE;
+              data[1] = UDS_WRITE_DATA_BY_IDENTIFIER;
               data[2] = UDS_NRC_incorrectMessageLengthOrInvalidFormat;
               BUS_output(data, 3);
             } else {
@@ -584,8 +582,8 @@ void analyse_BT_Protocol(char receive_BT_Array[]) {
                 BUS_output(data, 3);
               } else {
                 uint8_t data[3];
-                data[0] = 0x7f;
-                data[1] = 0x2e;
+                data[0] = UDS_NRC_CODE;
+                data[1] = UDS_WRITE_DATA_BY_IDENTIFIER;
                 data[2] = UDS_NRC_requestOutOfRange;
                 BUS_output(data, 3);
               }
@@ -599,8 +597,8 @@ void analyse_BT_Protocol(char receive_BT_Array[]) {
             val = receive_BT_Array[3];
             if (val == NULL) {
               uint8_t data[3];
-              data[0] = 0x7f;
-              data[1] = 0x2e;
+              data[0] = UDS_NRC_CODE;
+              data[1] = UDS_WRITE_DATA_BY_IDENTIFIER;
               data[2] = UDS_NRC_incorrectMessageLengthOrInvalidFormat;
               BUS_output(data, 3);
             } else {
@@ -613,31 +611,6 @@ void analyse_BT_Protocol(char receive_BT_Array[]) {
               BUS_output(data, 3);
             }
           } else
-          /* This part should set the OldSensorNewSensor */
-          /* 0x2E 0x06 0x0C 0x!!......*/
-          if ((receive_BT_Array[1] == 0x06) && (receive_BT_Array[2] == 0x0C)) {
-            bool val = NULL;
-            val = (bool)receive_BT_Array[3];
-            if (val == NULL) {
-              uint8_t data[3];
-              data[0] = 0x7f;
-              data[1] = 0x2e;
-              data[2] = UDS_NRC_incorrectMessageLengthOrInvalidFormat;
-              BUS_output(data, 3);
-            } else {
-              if (NewOilSensorEquipped != val) {
-                NewOilSensorEquipped = val;
-                preferences.begin(EEPROMNameSpace, false);
-                preferences.putBool("NewSensorflag", val);
-                preferences.end();
-              }
-                uint8_t data[3];
-                data[0] = posResponse;
-                data[1] = 0x06;
-                data[2] = 0x0C;
-                BUS_output(data, 3);
-            }
-          } else
           /* This part should set the compare values for OilTemperature of old Sensor
           /* 0x2E 0x07 0x00 0x!! 0x!!  0x!! 0x!! 0x!!......*/
           if ((receive_BT_Array[1] == 0x07) && (receive_BT_Array[2] == 0x00)) {
@@ -645,8 +618,8 @@ void analyse_BT_Protocol(char receive_BT_Array[]) {
             val = receive_BT_Array[3];
             if (val == NULL) {
               uint8_t data[3];
-              data[0] = 0x7f;
-              data[1] = 0x2e;
+              data[0] = UDS_NRC_CODE;
+              data[1] = UDS_WRITE_DATA_BY_IDENTIFIER;
               data[2] = UDS_NRC_incorrectMessageLengthOrInvalidFormat;
               BUS_output(data, 3);
             } else {
@@ -698,8 +671,8 @@ void analyse_BT_Protocol(char receive_BT_Array[]) {
             val = receive_BT_Array[3];
             if (val == NULL) {
               uint8_t data[3];
-              data[0] = 0x7f;
-              data[1] = 0x2e;
+              data[0] = UDS_NRC_CODE;
+              data[1] = UDS_WRITE_DATA_BY_IDENTIFIER;
               data[2] = UDS_NRC_incorrectMessageLengthOrInvalidFormat;
               BUS_output(data, 3);
             } else {
@@ -743,8 +716,8 @@ void analyse_BT_Protocol(char receive_BT_Array[]) {
             val = (uint8_t)receive_BT_Array[3];
             if (val == NULL) {
               uint8_t data[3];
-              data[0] = 0x7f;
-              data[1] = 0x2e;
+              data[0] = UDS_NRC_CODE;
+              data[1] = UDS_WRITE_DATA_BY_IDENTIFIER;
               data[2] = UDS_NRC_incorrectMessageLengthOrInvalidFormat;
               BUS_output(data, 3);
             } else {
@@ -756,7 +729,7 @@ void analyse_BT_Protocol(char receive_BT_Array[]) {
             }
           } else{
             uint8_t data[3];
-            data[0] = 0x7f;
+            data[0] = UDS_NRC_CODE;
             data[1] = UDS_WRITE_DATA_BY_IDENTIFIER;
             data[2] = UDS_NRC_requestOutOfRange;
             BUS_output(data, 3);
@@ -777,7 +750,7 @@ void analyse_BT_Protocol(char receive_BT_Array[]) {
               BUS_output(data, 1);
             } else {
             uint8_t data[3];
-            data[0] = 0x7F;
+            data[0] = UDS_NRC_CODE;
             data[1] = UDS_Session_Control;
             data[2] = UDS_NRC_subFunctionNotSupported;
             BUS_output(data, 3);
@@ -789,17 +762,17 @@ void analyse_BT_Protocol(char receive_BT_Array[]) {
               uint8_t data[1];
               data[0] = 0x51;
               BUS_output(data, 1);
-              delay(1500);
+              delay(1000);
               ESP.restart();
             }
           }else{
             uint8_t data[3];
-            data[0] = 0x7F;
+            data[0] = UDS_NRC_CODE;
             data[1] = receive_BT_Array[0];
             data[2] = UDS_NRC_serviceNotSupported;
             BUS_output(data, 3);
           }
           delete_BT_buffer();
         }
-        NewData = false;
+        newBTData = false;
       }

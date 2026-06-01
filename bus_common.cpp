@@ -10,7 +10,7 @@ BLEServer *pServer = NULL;
 BLECharacteristic * pTxCharacteristic;
 bool deviceConnected = false;
 bool oldDeviceConnected = false;
-bool newData = false;
+bool newOilSensorData = false;
 
 long lastMsg = 0;
 String receiveString;
@@ -21,18 +21,25 @@ String receiveString;
 
 void BUS_output(uint8_t data[],uint8_t len)
 {
-      //pTxCharacteristic->setValue(data);
+
       pTxCharacteristic->setValue(data,len);
       pTxCharacteristic->notify(); // Sende Wert an App
 }
 
 void BUS_outputStr(String data)
 {
+      String transData = data + "\r" + "\n";
+      //pTxCharacteristic->setValue(data);
+      pTxCharacteristic->setValue(transData);
+      pTxCharacteristic->notify(); // Sende Wert an App
+}
+
+void BUS_outputUint16_t(uint16_t data)
+{
       //pTxCharacteristic->setValue(data);
       pTxCharacteristic->setValue(data);
       pTxCharacteristic->notify(); // Sende Wert an App
 }
-
 
 // Callback-Funktionen für Verbindungsstatus
 class MyServerCallbacks: public BLEServerCallbacks {
@@ -52,7 +59,7 @@ class MyCallbacks: public BLECharacteristicCallbacks {
     void onWrite(BLECharacteristic *pCharacteristic) {
    // String rxValue = pCharacteristic->getValue();
       receiveString= pCharacteristic->getValue();
-      newData = true;  
+      newOilSensorData = true;  
     }
 };
 
@@ -127,11 +134,11 @@ void loopfunction()
 
 String bus_getReceiveString()
 {
-    newData = false;
+    newOilSensorData = false;
     return receiveString;
 }
 
 bool bus_AreNewDataThere()
 {
-    return newData;
+    return newOilSensorData;
 }

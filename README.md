@@ -22,6 +22,10 @@
   The old Version has a metal big Plate at the Bottom and the Tube to measure the oil is ONE PIECE and is formed in a small rectangular form and NOT Square.
 
 
+
+
+
+
   The "new" Version, used in 
   - Audi A4, A6 from 2010
   - Audi Q5 from 2010
@@ -36,12 +40,20 @@
 
   In the newer Version the Bottom is made of plastic and the Tube to measure the oil is Two PIECES. The Tube itself is formed in a H-Design and at the top of the Tube is a square 2nd Part
 
+
+
+
+
+
+
   The newest version is built in in many actual cars
   The newest Version has the Part Numbers (f.e. Hella   6PR 013 680-031  )
   - 03C 907 660 C
 
 
   In the newest Version the Bottom is made of plastic and the Tube to measure the oil is one round small tube with one light blue cap.
+
+
 
   This code is based on the Information from https://www.mikrocontroller.net/topic/459687 (which uses the "old" Version)
 
@@ -91,30 +103,20 @@ There are the Services:
 
 The Services 0x22 (ReadDataByIdentifier): has the following Subfunctions
 
-- 0x22 0xF1 0xAB           Read SW-Version                                 Returns the SW Version
-- 0x22 0xF1 0x86           Read Session                                    Returns  the actucal Session is on (true) or not (false)
-- 0x22 0xF1 0x90           Read Name of Central Chip                       Returns the Modelname of the central Mikrocontroller e.g. ESP32,ESP32_S3
-- 0x22 0xF1 0x91           Read OEMPartNumber of OilSensor                 Returns the Partnumber of the OilTempsensor used by the OEM
-- 0x22 0xF1 0x92           Read OEMPartNumber of WaterSensor               Returns the Partnumber of the WaterTempsensor used by the OEM
-- 0x22 0xF1 0x93           Read SupplierPartNumber of OilSensor            Returns the Partnumber of the OilTempsensor used by the Supplier (Hella,Febi etc)
-- 0x22 0xF1 0x94           Read SupplierPartNumber of WaterSensor          Returns the Partnumber of the WaterTempsensor used by the Supplier (Hella,Febi etc)
-- 0x22 0xF1 0x97           Read Systemname                                 Returns the SystemName of the Module
-- 0x22 0x06 0x00           Read Coding                                     Returns the Coding
-- 0x22 0x06 0x01           Read DebugOilTemperature                        Returns the DebugValue of the OilLevel in Degree Celsius which is used in Debugmode
-- 0x22 0x06 0x02           Read DebugOilLevelPercentage                    Returns the DebugValue of the OilLevel in percent which is used in Debugmode
-- 0x22 0x06 0x03           Read Real Oil Tempeature                        Returns the value of Oiltemperature in Degree celsius which is used from the SW at the Moment
-- 0x22 0x06 0x04           Read Real Oil Level                             Returns the value of OilLevel in Percent which is used from the SW at the Moment
-- 0x22 0x06 0x0A           Read the Brand                                  Returns the Brand
-- 0x22 0x06 0x0B           Read Extra OutputPin                            Returns the Status if the extra outputpin is active or not
-
-- 0x22 0x07 0x00           Read the OilTempCompareValues                   Returns an array of 2*8bytes * N of Compare impulsevalues for Sensor, which are used to compare the measured impulses for Temperature with this values.. starting from Oiltempeatur 30°C...Pay attention the values are uint16_t byte[3] (highbyte) byte[4](lowbyte) tempersture30...
-- 0x22 0x07 0x01           Read the OilLevelCompareValues                  Returns an array of 2*8bytes * N of Compare impulsevalues for Sensor, which are used to compare the measured impulses for OilLevel with this values..... starting from Oillevel empty...Pay attention the values are uint16_t byte[3] (highbyte) byte[4](lowbyte) oillevel empty...
-
-- 0x22 0x07 0x02           Read Number of DTC Entries                      Returns the number of stored DTCs
-- 0x22 0x07 0x03           Read Status of DTC-Bits                         Returns the complete uint32_t DTC Storage and shows which DTCs bits are Active. The Bitmask is defined                                                                            in dtc_oilsensor_defines.h
-
-
-  
+- 0x22 0xF1 0xAB                            Read SW-Version                     (Returns the SW Version)
+- 0x22 0xF1 0x86                            Read Session                        (Returns  the actucal Session is on (true) or not (false))
+- 0x22 0xF1 0x97                            Read Systemname                     (Returns the SystemName of the Module)
+- 0x22 0x06 0x00                            Read DebugOilTemperature            Returns the Value of the OilLevel in Degree Celsius which is used in Debugmode
+- 0x22 0x06 0x01                            Read DebugOilLevelPercentage        Returns the Value of the OilLevel in percent which is used in Debugmode
+- 0x22 0x06 0x02                            Read Real Oil Tempeature            Returns the value of Oiltemperature in Degree celsius which is used from the SW at the Moment
+- 0x22 0x06 0x03                            Read Real Oil Level                 Returns the value of OilLevel in Percent which is used from the SW at the Moment
+- 0x22 0x06 0x04                            Read the OilTempCompareValues       Returns an array of 2*8bytes * N of Compare impulsevalues for old Sensor, which are used to compare the measured impulses for Temperature with this values.. starting from Oiltempeatur 30°C...Pay attention the values are uint16_t byte[3] (highbyte) byte[4](lowbyte) tempersture30...
+- 0x22 0x06 0x05                            Read the OilLevelCompareValues      Returns an array of 2*8bytes * N of Compare impulsevalues for old Sensor, which are used to compare the measured impulses for OilLevel with this values..... starting from Oillevel empty...Pay attention the values are uint16_t byte[3] (highbyte) byte[4](lowbyte) oillevel empty...
+- 0x22 0x06 0x06                            Read the OilTempCompareValues       Returns an array of 2*8bytes * N of Compare impulsevalues for new Sensor, which are used to compare the measured impulses for Temperature with this values.. starting from Oiltempeatur 30°C...Pay attention the values are uint16_t byte[3] (highbyte) byte[4](lowbyte) tempersture30...
+- 0x22 0x06 0x07                            Read the OilLevelCompareValues      Returns an array of 2*8bytes * N of Compare impulsevalues for new Sensor, which are used to compare the measured impulses for OilLevel with this values..... starting from Oillevel empty...Pay attention the values are uint16_t byte[3] (highbyte) byte[4](lowbyte) oillevel empty...
+- 0x22 0x06 0x0A                            Read the Brand                      Returns the Brand
+- 0x22 0x06 0x0B                            Read Extra OutputPin                Returns the Status if the extra outputpin is active or not
+- 0x22 0x06 0x0C                            Read New Old SensorFlag             Returns the flag of new or old sensor is equipped (true/0x01 -> New Sensor, false/0x00 -> Oldsensor)
 
 
 

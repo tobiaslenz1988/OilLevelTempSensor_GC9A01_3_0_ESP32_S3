@@ -7,6 +7,6 @@
 //                                     2) A= ESP32    B= ESP32 S3
 //                                     3) + 4) SW Version 16Bit
 #define SOFTWAREVERSION               "BB0F"
-
+#define DEFAULT_HWMODELLNAME          {'-','-','-','-','-', '-','-','-','-','-', '-','-','-','-','-'}
 
 #endif /* SOFTWAREVERSION_H */

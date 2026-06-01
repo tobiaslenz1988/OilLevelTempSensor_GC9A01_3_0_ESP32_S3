@@ -3,7 +3,7 @@
 #include <TJpg_Decoder.h>
 #include <TFT_eSPI.h>
 #include <SPI.h>
-
+#include <Arduino.h>
 #include "display/Oil_LevelGraphic_GCA901_240_240/oil_level_graphic.h"
 #include "display/display_selector.h"
 #include "display/logos/logos.h"
@@ -19,6 +19,7 @@
 #include <stdlib.h>
 #include <iostream>
 #include <string.h>
+#include <string>
 
 Preferences preferences;
 
@@ -32,8 +33,9 @@ uint8_t testValue_oilTemperature        = 85; /* Debugvalue 255 */
 uint8_t testValue_oilLevelPercentage    = 60; /* Debugvalue 255 */
 uint8_t lastOilTemp                     = 0;
 uint8_t lastOilLevel                    = 0;
-uint8_t brandSelector                   = 1;
-
+uint8_t brandSelector                   = BRAND_VW;
+uint8_t oilSensorSelector               = SENSOR_OILTEMPSENSOR_UNDEFINED;
+uint8_t waterSensorSelector             = SENSOR_WATERTEMPSENSOR_UNDEFINED;
 
 hw_timer_t *timer                                 = NULL; 
 portMUX_TYPE timerMux                             =  portMUX_INITIALIZER_UNLOCKED;
@@ -41,7 +43,7 @@ portMUX_TYPE timerMux                             =  portMUX_INITIALIZER_UNLOCKE
 String  Modulename                                =  {0,0,0,0,0, 0,0,0,0,0 ,0,0,0,0,0, 0,0,0,0,0};
 
 /* The HWModuleName is the Modelanme of the used central Bt Module */
-String  HWModelleName                             =  {'-','-','-','-','-', '-','-','-','-','-', '-','-','-','-','-'};
+String  HWModelleName                             =  CHIP_MODEL;
 
 /* The Partnumber of the OilTempsensor  of the OEM */
 String  oemPartNumberOilTempSensor                =  DEFAULT_OEM_PARTNUMBER_OIL_TEMPSENSOR;
@@ -56,23 +58,26 @@ String  oemPartNumberWaterTempSensor              =  DEFAULT_OEM_PARTNUMBER_WATE
 String  supplierPartNumberWaterTempSensor         =  DEFAULT_SUPPLIER_PARTNUMBER_WATER_TEMPSENSOR;
 String  UDS_receiveString;
 
+
+
+static uint16_t                         arrayNumberImpuls[4];
+static uint16_t                         returnArray[4];
+uint16_t OilTempCompValues[]            = {SENSOR_Temperature_30,SENSOR_Temperature_40,SENSOR_Temperature_50,SENSOR_Temperature_55,SENSOR_Temperature_60,SENSOR_Temperature_65,SENSOR_Temperature_70,SENSOR_Temperature_75,SENSOR_Temperature_80,SENSOR_Temperature_85,SENSOR_Temperature_90,SENSOR_Temperature_95,SENSOR_Temperature_100,SENSOR_Temperature_105,SENSOR_Temperature_110,SENSOR_Temperature_115};
+uint16_t OilLevelCompValues[]           = {SENSOR_OilLevelEmpty,SENSOR_OilLevel_10,SENSOR_OilLevel_20,SENSOR_OilLevel_30,SENSOR_OilLevel_40,SENSOR_OilLevel_50,SENSOR_OilLevel_60,SENSOR_OilLevel_70,SENSOR_OilLevel_80,SENSOR_OilLevel_90,SENSOR_OilLevelFull};
 uint16_t cnt                            = 0;
 uint16_t startUpCounter                 = 0;
+uint16_t delayCnt                       = 0;
 
-static uint16_t                         cntRawArr[4];
-static uint16_t                         returnArray[4];
-uint16_t OilTempCompValues[]         = {SENSOR_Temperature_30,SENSOR_Temperature_40,SENSOR_Temperature_50,SENSOR_Temperature_55,SENSOR_Temperature_60,SENSOR_Temperature_65,SENSOR_Temperature_70,SENSOR_Temperature_75,SENSOR_Temperature_80,SENSOR_Temperature_85,SENSOR_Temperature_90,SENSOR_Temperature_95,SENSOR_Temperature_100,SENSOR_Temperature_105,SENSOR_Temperature_110,SENSOR_Temperature_115};
-uint16_t OilLevelCompValues[]        = {SENSOR_OilLevelEmpty,SENSOR_OilLevel_10,SENSOR_OilLevel_20,SENSOR_OilLevel_30,SENSOR_OilLevel_40,SENSOR_OilLevel_50,SENSOR_OilLevel_60,SENSOR_OilLevel_70,SENSOR_OilLevel_80,SENSOR_OilLevel_90,SENSOR_OilLevelFull};
-
-bool NewData                            = false;
+bool newBTData                          = false;
+bool newOilSensorImpulse                = false;
 bool TimeoutSensorDetected              = true;
 bool toggleInvertDisplayFlag            = false;
-bool NewOilSensorEquipped               = false;
 bool statusOfExtraOutputPin             = false;
 bool Impuls_1_High                      = false;
 bool Impuls_1_Low                       = false;
 bool Impuls_2_High                      = false;
 bool Impuls_2_Low                       = false;
+bool newMeasurementFinished             = false;
 
 TFT_eSPI   tft = TFT_eSPI();
 #define SignalInputPin                2
@@ -94,22 +99,19 @@ TFT_eSPI   tft = TFT_eSPI();
 #define GC9A01A_WHITE                 0xFFFF
 #define GC9A01A_RED                   0xF800
 #define GC9A01A_BLUE                  0x001F
-#define time10s_ShowBrandLogo         400
-uint8_t tflag = 0;
-
+#define time10s_ShowBrandLogo         400  //this time is multiplied by 10ms this means the brandlogo is shown for 400 * 10ms = 4000ms =4s
+#define DEBUG_TOGGLEPIN               41
 
     
 
 void ARDUINO_ISR_ATTR onTimer() {
-  static bool toggleflag;
+
   /* This toggle is for debug purpose only.. */
   /* You could verify at Pin ISRDebugTogglePin how often the ISR is called. */
-  if (toggleflag) {
+  if (digitalRead(ISRDebugTogglePin)==1) {
     digitalWrite(ISRDebugTogglePin, LOW);
-    toggleflag =  false;
   } else {
     digitalWrite(ISRDebugTogglePin, HIGH);
-    toggleflag = true;
   }
   signalinput = digitalRead(SignalInputPin);
   
@@ -118,40 +120,33 @@ void ARDUINO_ISR_ATTR onTimer() {
     // T1 
     Impuls_1_High = true;
     TimeoutSensorDetected = false;
+    newMeasurementFinished = false;
 
   } else if ((signalinput == 0x00) && (Impuls_1_High == true) && (Impuls_1_Low == false) && (Impuls_2_High == false) && (Impuls_2_Low == false)) {
     //  first low signal 
     // T2 
     Impuls_1_Low = true;
-    portENTER_CRITICAL(&timerMux);
-    cntRawArr[0] = cnt;
-    portEXIT_CRITICAL(&timerMux);
+    arrayNumberImpuls[0] = cnt;
 
   } else if ((signalinput == 0x01) && (Impuls_1_High == true) && (Impuls_1_Low == true) && (Impuls_2_High == false) && (Impuls_2_Low == false)) {
     // 2nd high signal 
     // T3 
     Impuls_2_High = true;
-    portENTER_CRITICAL(&timerMux);
-    cntRawArr[1] = cnt;
-    portEXIT_CRITICAL(&timerMux);
+    arrayNumberImpuls[1] = cnt;
 
   } else if ((signalinput == 0x00) && (Impuls_1_High == true) && (Impuls_1_Low == true) && (Impuls_2_High == true) && (Impuls_2_Low == false)) {
     // T4 
     Impuls_2_Low = true;
-    portENTER_CRITICAL(&timerMux);
-    cntRawArr[2] = cnt;
-    portEXIT_CRITICAL(&timerMux);
-
+    arrayNumberImpuls[2] = cnt;
   } else if ((signalinput == 0x01) && (Impuls_1_High == true) && (Impuls_1_Low == true) && (Impuls_2_High == true) && (Impuls_2_Low == true)) {
     // T5 
     Impuls_1_High = false;
     Impuls_2_High = false;
     Impuls_1_Low  = false;
     Impuls_2_Low  = false;
-    portENTER_CRITICAL(&timerMux);
-    cntRawArr[3] = cnt;
-    portEXIT_CRITICAL(&timerMux);
+    arrayNumberImpuls[3] = cnt;
     cnt = 1;
+    newMeasurementFinished = true;
   }
  
   if (Impuls_1_High == true) {
@@ -162,17 +157,20 @@ void ARDUINO_ISR_ATTR onTimer() {
   /* if sensor is disconnected -> cnt is higher than TimeoutSignalMS 1500->set to 0xFE*/
   if(cnt>TimeoutSignalMS)
   { 
-    cntRawArr[0] = OilLevelPercentageErrorValue;
-    cntRawArr[1] = OilLevelPercentageErrorValue;
-    cntRawArr[2] = OilLevelPercentageErrorValue;
-    cntRawArr[3] = OilLevelPercentageErrorValue;
+    arrayNumberImpuls[0] = OilLevelPercentageErrorValue;
+    arrayNumberImpuls[1] = OilLevelPercentageErrorValue;
+    arrayNumberImpuls[2] = OilLevelPercentageErrorValue;
+    arrayNumberImpuls[3] = OilLevelPercentageErrorValue;
     TimeoutSensorDetected = true;
     cnt = 1;
+    newMeasurementFinished = false;
   }
 }
 
 
-void  orderImpulse(uint16_t inputArr[]) {
+bool  orderImpulse(uint16_t inputArr[],bool newData) {
+  bool retval = false;
+  if(newData){
   /* This Method orders the measured impulses into the correct sequence..*/
   /* There might be the case that the Uc starts at the wrong Time and interprets T4 (see at ine 71) as the start of the sequence ..*/
   /* This method returns a sequence of Four measured where the beginning of the Signal is always stored in returnArray[0] */
@@ -211,49 +209,67 @@ void  orderImpulse(uint16_t inputArr[]) {
         returnArray[2] = tempArray[2]; /* 3) 20ms  High    T4 */
         returnArray[3] = tempArray[3]; /* 4) 160ms BigLow  T5 */
     }
+    retval = true;
+  }
+  return retval;
 }
 
 
 void sendInfosToBT(uint8_t temperature, uint8_t OilLevel,uint16_t outputarr[]) {
-  /*
   if (session == UDS_Session_Control_Development_Session)
   {
-    uint8_t i;
-    //Serial.write(0xFF);
-    for (i = 0; i < 4; i++) 
+    if(delayCnt>50)
     {
-      if (i == 0) {
-        SerialBT.print("T2:");
+      delayCnt =0;
+      uint8_t i;
+      for (i = 0; i < 4; i++) 
+      {
+        if (i == 0) {
+          BUS_outputStr("T2:");
+        }
+        if (i == 1) {
+          BUS_outputStr("T3:");
+        }
+        if (i == 2) {
+          BUS_outputStr("T4:");
+        }
+        if (i == 3) {
+          BUS_outputStr("T5:");
+        }
+          BUS_outputStr(String(outputarr[i]));
       }
-      if (i == 1) {
-        SerialBT.print("T3:");
+      BUS_outputStr("   ");
+      
+      BUS_outputStr("Softwareversion");
+      
+      BUS_outputStr(SOFTWAREVERSION);
+    
+      BUS_outputStr("Sensor TO detected: ");
+      BUS_outputStr(String(TimeoutSensorDetected));
+
+    
+      BUS_outputStr("Startupcounter");
+      BUS_outputStr(String(startUpCounter));
+
+      uint8_t temp[1];
+      BUS_outputStr("Temperature: ");
+      temp[0]= temperature;
+      BUS_outputStr(String(temp[0]));
+      BUS_outputStr("OilLevel: ");
+      temp[0]= OilLevel;
+      BUS_outputStr(String(temp[0]));
+      //delay(1000);
       }
-      if (i == 2) {
-        SerialBT.print("T4:");
+      else
+      {
+        delayCnt=delayCnt+1;
       }
-      if (i == 3) {
-        SerialBT.print("T5:");
-      }
-      SerialBT.println(outputarr[i]);
-    }
-    SerialBT.println("");
-  
-    SerialBT.print("Softwareversion");
-    //String stri = SoftwareVersion;
-    SerialBT.println(SOFTWAREVERSION);
-  
-    SerialBT.print("Sensor TO detected: ");
-    SerialBT.println(TimeoutSensorDetected);
-    SerialBT.print("startUpCounter");
-    SerialBT.println(startUpCounter);
- 
-    SerialBT.print("Temperature: ");
-    SerialBT.println(temperature);
-    SerialBT.print("OilLevel: ");
-    SerialBT.println(OilLevel);
-    delay(1000);
   }
-  */
+  else
+  {
+    delayCnt=0;
+  }
+
 }
 
 
@@ -314,10 +330,8 @@ void showOilLevelNormalOperation(uint8_t percentageOillevel,bool initflag)
         tft.print("C");
         setDTC(DTC_BIT_07_OILTEMP_TO_HIGH);
       }
-  
       printNumberDTC();
     
-
     }else{
       if(initflag==false)
       {
@@ -380,7 +394,7 @@ void showOilLevelNormalOperation(uint8_t percentageOillevel,bool initflag)
 void controlOfDisplay()
 {
   //tft.fillScreen(GC9A01A_BLACK);
-  if ((startUpCounter>=time10s_ShowBrandLogo) && (startUpCounter<=1000) )
+  if ((startUpCounter>=time10s_ShowBrandLogo))
   {
     if(startUpCounter==time10s_ShowBrandLogo){
       tft.fillScreen(GC9A01A_BLACK);
@@ -407,6 +421,7 @@ void controlOfDisplay()
     startUpCounter = startUpCounter+1;
   }
 }
+
 void showBrandLogo(uint8_t brandvalue)
 {  
   uint16_t w = 0, h = 0;
@@ -464,11 +479,9 @@ void readEepromValues()
   preferences.begin(EEPROMNameSpace, false);
     
   session                                 = (uint8_t) preferences.getUChar("session",UDS_Session_Control_Default_Session);
-  NewOilSensorEquipped                    = preferences.getBool("NewSensorflag",false);
   brandSelector                           = preferences.getUChar("Brand",BRAND_VW);
 
   Modulename                              =  preferences.getString("Modulename","OilSensor");
-  HWModelleName                           =  preferences.getString("HWModuleName",{'-','-','-','-','-',    '-','-','-','-','-',    '-','-','-','-','-' }); 
   oemPartNumberOilTempSensor              =  preferences.getString("PartNumberOilTempSensor",DEFAULT_OEM_PARTNUMBER_OIL_TEMPSENSOR);
   supplierPartNumberOilTempSensor         =  preferences.getString("supplierPartNumberOilTempSensor",DEFAULT_SUPPLIER_PARTNUMBER_OIL_TEMPSENSOR);
   oemPartNumberWaterTempSensor            =  preferences.getString("PartNumberWaterTempSensor", DEFAULT_OEM_PARTNUMBER_WATER_TEMPSENSOR); 
@@ -527,13 +540,11 @@ bool tft_output(int16_t x, int16_t y, uint16_t w, uint16_t h, uint16_t* bitmap)
 
 void letDebugPinToggle()
 {
-  if(tflag==0)
+  if(digitalRead(DEBUG_TOGGLEPIN))
   {
-    digitalWrite(41, LOW);
-    tflag=1;
+    digitalWrite(DEBUG_TOGGLEPIN, LOW);
   }else{
-    digitalWrite(41, HIGH);
-    tflag=0;
+    digitalWrite(DEBUG_TOGGLEPIN, HIGH);
   }
 }
 
@@ -569,6 +580,10 @@ void printNumberDTC()
       tft.setCursor(180, 30);
       tft.print(numberOfDTCEntries());
     }
+}
+void printOilLevel()
+{
+  
 }
 
 void setup() {
@@ -613,18 +628,20 @@ void setup() {
   // The decoder must be given the exact name of the rendering function above
   TJpgDec.setCallback(tft_output);
 
-  checkcoding
+  checkCoding();
 }
 
 void loop() {
   letDebugPinToggle();
   loopfunction();
-  orderImpulse(cntRawArr);
-  convertImpulseToPercentage((uint16_t)returnArray[1], (uint16_t)returnArray[3],(uint8_t)session);
+  portENTER_CRITICAL(&timerMux);
+  newOilSensorImpulse = orderImpulse(arrayNumberImpuls,newMeasurementFinished);
+  portEXIT_CRITICAL(&timerMux);
+  convertImpulseToPercentage((uint16_t)returnArray[1], (uint16_t)returnArray[3],(uint8_t)session,newOilSensorImpulse);
   sendInfosToBT(oilTemperature, oilLevelPercentage,returnArray);
   //TempToggle = showLevelAndTempAtLED(TempToggle,oilLevelPercentage,oilTemperature);
-  NewData = bus_AreNewDataThere();
-  convertReceivedData(NewData);
+  newBTData = bus_AreNewDataThere();
+  convertReceivedData(newBTData);
   analyse_BT_Protocol(charArrGlobal);
   controlOfDisplay();
   lastOilTemp = oilTemperature;

@@ -5,7 +5,7 @@
 #define OutputPin                     38
 #define Buffersize                    35
 
-extern bool  NewData;      
+extern bool  newBTData;      
 extern bool  statusOfExtraOutputPin;
 extern uint8_t brandSelector;
 extern char SoftwareVersion[];
